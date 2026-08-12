@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   try {
     const result = await cached("demo:dips", TTL.demoScan, () =>
-      scanForDips([], 20)
+      scanForDips([], "balanced")
     );
 
     return NextResponse.json(

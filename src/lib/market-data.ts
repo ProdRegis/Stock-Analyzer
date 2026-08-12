@@ -1,6 +1,12 @@
 import { yahooFinance } from "./yahoo-client";
 import { TTL, cacheRead, cacheWrite, cached } from "./cache";
-import type { MarketCompanyDetails, MarketSearchResult, PricePoint } from "./types";
+import type {
+  ChartInterval,
+  ChartRange,
+  MarketCompanyDetails,
+  MarketSearchResult,
+  PricePoint,
+} from "./types";
 
 async function loadQuote(symbol: string) {
   return yahooFinance.quote(symbol);
@@ -204,6 +210,75 @@ export async function fetchIntradayHistory(
     });
 
     return normalizeIntradayHistory(result.quotes);
+  });
+}
+
+interface RangeSpec {
+  interval: ChartInterval;
+  /** Calendar days of lookback requested from upstream. */
+  lookbackDays: number;
+  ttl: number;
+  /** Keep only the most recent session's bars after fetching. */
+  lastSessionOnly?: boolean;
+}
+
+/**
+ * Bar size per range, chosen so each chart lands in the low hundreds of points.
+ * Yahoo caps how far back fine intervals go — one-minute bars are only served
+ * for the last few days — so the coarser ranges step up to wider bars.
+ */
+const RANGE_SPECS: Record<ChartRange, RangeSpec> = {
+  // Asks for several days so the chart still fills in on a Monday or over a
+  // weekend, then keeps just the latest session.
+  "1D": {
+    interval: "1m",
+    lookbackDays: 5,
+    ttl: TTL.chartIntraday,
+    lastSessionOnly: true,
+  },
+  "7D": { interval: "15m", lookbackDays: 7, ttl: TTL.chartMultiDay },
+  "1M": { interval: "1d", lookbackDays: 31, ttl: TTL.dailyHistory },
+  "3M": { interval: "1d", lookbackDays: 93, ttl: TTL.dailyHistory },
+  "1Y": { interval: "1d", lookbackDays: 366, ttl: TTL.dailyHistory },
+  "5Y": { interval: "1wk", lookbackDays: 5 * 366, ttl: TTL.chartWeekly },
+};
+
+export function chartIntervalFor(range: ChartRange): ChartInterval {
+  return RANGE_SPECS[range].interval;
+}
+
+/** Drops every bar before the final calendar day present in the series. */
+function keepLastSession(points: PricePoint[]): PricePoint[] {
+  if (points.length === 0) return points;
+
+  const lastDay = points[points.length - 1].date.split("T")[0];
+  return points.filter((point) => point.date.startsWith(lastDay));
+}
+
+export async function fetchChartRange(
+  symbol: string,
+  range: ChartRange
+): Promise<PricePoint[]> {
+  const upper = symbol.toUpperCase();
+  const spec = RANGE_SPECS[range];
+
+  return cached(`chart:${upper}:${range}`, spec.ttl, async () => {
+    const period1 = new Date(
+      Date.now() - spec.lookbackDays * 24 * 60 * 60 * 1000
+    );
+
+    const result = await yahooFinance.chart(upper, {
+      period1,
+      interval: spec.interval,
+    });
+
+    const quotes = result.quotes as RawQuote[];
+    const points =
+      spec.interval === "1d" || spec.interval === "1wk"
+        ? normalizeDailyHistory(quotes)
+        : normalizeIntradayHistory(quotes);
+
+    return spec.lastSessionOnly ? keepLastSession(points) : points;
   });
 }
 

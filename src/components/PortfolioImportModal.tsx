@@ -315,7 +315,7 @@ export default function PortfolioImportModal({
               <button
                 type="button"
                 onClick={() => apply("replace")}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-black transition hover:bg-blue-500"
               >
                 Replace portfolio
               </button>
@@ -325,7 +325,7 @@ export default function PortfolioImportModal({
               type="button"
               onClick={readPasted}
               disabled={pasted.trim() === ""}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Read holdings
             </button>

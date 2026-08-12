@@ -28,6 +28,12 @@ export const TTL = {
   intradayHistory: 30_000,
   /** Short enough to feel live, long enough to absorb 1s client polling. */
   quote: 5_000,
+  /** Minute bars for the 1D chart; matches the intraday history cadence. */
+  chartIntraday: 30_000,
+  /** 15-minute bars for the 7D chart, which only change four times an hour. */
+  chartMultiDay: 5 * 60_000,
+  /** Weekly bars for the 5Y chart; only the in-progress week moves. */
+  chartWeekly: 30 * 60_000,
   quoteSummary: 10 * 60_000,
   search: 5 * 60_000,
   trending: 5 * 60_000,

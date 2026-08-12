@@ -8,15 +8,15 @@ interface CorrelationHeatmapProps {
   avgCorrelation: number;
 }
 
-/** Blue for negative correlation through slate at zero to red at +1. */
+/** Cyan for negative correlation through bare surface at zero to red at +1. */
 function cellColor(value: number): string {
   const clamped = Math.max(-1, Math.min(1, value));
 
   if (clamped >= 0) {
-    // 0 → transparent slate, 1 → strong red
-    return `rgba(239, 68, 68, ${(clamped * 0.75).toFixed(3)})`;
+    // 0 → transparent, 1 → strong red, since high correlation is the risk
+    return `rgba(255, 80, 0, ${(clamped * 0.75).toFixed(3)})`;
   }
-  return `rgba(59, 130, 246, ${(Math.abs(clamped) * 0.75).toFixed(3)})`;
+  return `rgba(0, 200, 240, ${(Math.abs(clamped) * 0.75).toFixed(3)})`;
 }
 
 function describe(avg: number): string {
@@ -111,7 +111,7 @@ export default function CorrelationHeatmap({
               className="h-2 flex-1 rounded-full"
               style={{
                 background:
-                  "linear-gradient(to right, rgba(59,130,246,0.75), rgba(30,41,59,0.6), rgba(239,68,68,0.75))",
+                  "linear-gradient(to right, rgba(0,200,240,0.75), rgba(43,49,55,0.6), rgba(255,80,0,0.75))",
               }}
             />
             <span>+1</span>

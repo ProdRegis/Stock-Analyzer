@@ -143,29 +143,11 @@ function CandidateCard({ candidate }: { candidate: BreakoutCandidate }) {
         <div className="mt-4 space-y-4 border-t border-slate-700/60 pt-4">
           <div>
             <h4 className="mb-2 text-sm font-medium text-slate-400">
-              Today — Live Intraday (updates every second)
-            </h4>
-            {candidate.intradayHistory.length > 0 ? (
-              <PriceChart
-                history={candidate.intradayHistory}
-                resistanceLevels={candidate.resistanceLevels}
-                symbol={`${candidate.symbol}-intra`}
-                mode="intraday"
-                showMovingAverages={false}
-              />
-            ) : (
-              <p className="text-sm text-slate-500">
-                Intraday data unavailable for this symbol.
-              </p>
-            )}
-          </div>
-
-          <div>
-            <h4 className="mb-2 text-sm font-medium text-slate-400">
-              Daily History with Resistance Lines
+              Price with Resistance Lines
             </h4>
             <PriceChart
               history={candidate.history}
+              intradayHistory={candidate.intradayHistory}
               resistanceLevels={candidate.resistanceLevels}
               symbol={candidate.symbol}
             />
@@ -441,7 +423,7 @@ export default function BreakoutScanner() {
             type="button"
             onClick={handleScan}
             disabled={scanning}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {scanning
               ? "Scanning..."

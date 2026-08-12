@@ -171,7 +171,7 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
                     onClick={() => setDirection(value)}
                     className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                       direction === value
-                        ? "bg-blue-600 text-white"
+                        ? "bg-blue-600 text-black"
                         : "bg-slate-800 text-slate-400 hover:text-white"
                     }`}
                   >
@@ -185,7 +185,7 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
               type="button"
               onClick={handleCalculate}
               disabled={loading}
-              className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading
                 ? "Calculating…"

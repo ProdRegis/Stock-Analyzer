@@ -8,10 +8,13 @@ import PriceChart from "./PriceChart";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
 import StopLossReasonList from "./StopLossReasonList";
 import { formatMarketState } from "@/lib/format";
-import type { BuyTimingWindow, DipCandidate, MarketSearchResult, SellReasonDetail, TradeDirection } from "@/lib/types";
+import type { BuyTimingWindow, DipCandidate, DipSensitivity, MarketSearchResult, SellReasonDetail, TradeDirection } from "@/lib/types";
 
 type DirectionFilter = "all" | TradeDirection;
 type TimingFilter = "all" | "tomorrow" | "this_week";
+
+/** How many top-ranked candidates keep ticking on the one-second live poll. */
+const LIVE_REFRESH_LIMIT = 12;
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-US", {
@@ -344,28 +347,13 @@ function DipCandidateCard({ candidate }: { candidate: DipCandidate }) {
 
       {expanded && (
         <div className="mt-4 space-y-4 border-t border-slate-700/60 pt-4">
-          {candidate.intradayHistory.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-slate-400">
-                Today — Live Intraday
-              </h4>
-              <PriceChart
-                history={candidate.intradayHistory}
-                resistanceLevels={candidate.resistanceLevels}
-                symbol={`${candidate.symbol}-intra`}
-                mode="intraday"
-                showMovingAverages={false}
-                heightClassName="h-56"
-              />
-            </div>
-          )}
-
           <div>
             <h4 className="mb-2 text-sm font-medium text-slate-400">
-              Daily History with Support / Resistance
+              Price with Support / Resistance
             </h4>
             <PriceChart
               history={candidate.history}
+              intradayHistory={candidate.intradayHistory}
               resistanceLevels={candidate.resistanceLevels}
               supportLevels={candidate.supportLevels}
               symbol={candidate.symbol}
@@ -446,6 +434,8 @@ export default function BestStocksPicker() {
   const [directionFilter, setDirectionFilter] = useState<DirectionFilter>("all");
   const [timingFilter, setTimingFilter] = useState<TimingFilter>("all");
   const [showingSample, setShowingSample] = useState(false);
+  const [sensitivity, setSensitivity] = useState<DipSensitivity>("balanced");
+  const [scannedCount, setScannedCount] = useState<number | null>(null);
 
   useEffect(() => {
     candidatesRef.current = candidates;
@@ -464,6 +454,7 @@ export default function BestStocksPicker() {
       if (!response.ok) throw new Error(data.error ?? "Sample unavailable");
 
       setCandidates(data.candidates ?? []);
+      setScannedCount(data.scanned ?? null);
       setScannedAt(data.scannedAt ?? null);
       setLiveUpdatedAt(data.scannedAt ?? null);
       setShowingSample(true);
@@ -480,7 +471,9 @@ export default function BestStocksPicker() {
     return () => window.clearTimeout(timer);
   }, [loadSample]);
 
-  const handleScan = useCallback(async () => {
+  // Takes the level explicitly so a sensitivity button can rescan with its own
+  // value instead of the stale one still captured in this closure.
+  const handleScan = useCallback(async (level: DipSensitivity = sensitivity) => {
     setScanning(true);
     setError(null);
     setShowingSample(false);
@@ -506,7 +499,7 @@ export default function BestStocksPicker() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ symbols, symbolsOnly, minScore: 20 }),
+        body: JSON.stringify({ symbols, symbolsOnly, sensitivity: level }),
       });
 
       const data = await response.json();
@@ -516,6 +509,7 @@ export default function BestStocksPicker() {
       }
 
       setCandidates(data.candidates ?? []);
+      setScannedCount(data.scanned ?? null);
       setScannedAt(data.scannedAt ?? new Date().toISOString());
       setLiveUpdatedAt(data.scannedAt ?? new Date().toISOString());
 
@@ -527,16 +521,23 @@ export default function BestStocksPicker() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Scan failed");
       setCandidates([]);
+      setScannedCount(null);
       setScannedAt(null);
       setLiveUpdatedAt(null);
     } finally {
       setScanning(false);
     }
-  }, [searchQuery, selectedStock]);
+  }, [searchQuery, selectedStock, sensitivity]);
 
   const refreshLive = useCallback(async () => {
     const current = candidatesRef.current;
     if (current.length === 0 || scanning || liveRefreshInFlight.current) return;
+
+    // Each candidate carries its own price history, so the round trip grows with
+    // the result count. Only the highest-ranked ones tick every second; the tail
+    // holds its scan-time values until the next full scan.
+    const live = current.slice(0, LIVE_REFRESH_LIMIT);
+    const frozen = current.slice(LIVE_REFRESH_LIMIT);
 
     liveRefreshInFlight.current = true;
     setLiveRefreshing(true);
@@ -546,7 +547,7 @@ export default function BestStocksPicker() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
-        body: JSON.stringify({ candidates: current }),
+        body: JSON.stringify({ candidates: live }),
       });
 
       const data = await response.json();
@@ -555,7 +556,7 @@ export default function BestStocksPicker() {
         throw new Error(data.error ?? "Live refresh failed");
       }
 
-      setCandidates(data.candidates ?? current);
+      setCandidates([...(data.candidates ?? live), ...frozen]);
       setLiveUpdatedAt(data.updatedAt ?? new Date().toISOString());
     } catch {
       // Keep last good data on tick failure.
@@ -600,8 +601,8 @@ export default function BestStocksPicker() {
             </div>
             <p className="mt-1 text-sm text-slate-500">
               Scans for the biggest dips likely to bounce (longs) and breakdown /
-              overextension setups (shorts). Prices and predictions update live every
-              second after a scan.
+              overextension setups (shorts). The top {LIVE_REFRESH_LIMIT} picks update
+              live every second; the rest hold their scan-time values.
             </p>
           </div>
           <div className="text-right text-xs text-slate-500">
@@ -633,9 +634,9 @@ export default function BestStocksPicker() {
           />
           <button
             type="button"
-            onClick={handleScan}
+            onClick={() => void handleScan()}
             disabled={scanning}
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-black transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {scanning
               ? "Scanning..."
@@ -657,8 +658,48 @@ export default function BestStocksPicker() {
             onChange={(event) => setLiveUpdates(event.target.checked)}
             className="rounded border-slate-600 bg-slate-800"
           />
-          Live updates every second (price, dip %, scores, buy timing)
+          Live updates every second for the top {LIVE_REFRESH_LIMIT} picks (price, dip
+          %, scores, buy timing)
         </label>
+
+        <div className="mt-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            How many setups to surface
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(
+              [
+                ["strict", "Strict", "Only the strongest setups"],
+                ["balanced", "Balanced", "Default screening"],
+                ["broad", "Broad", "Include weaker, earlier setups"],
+              ] as const
+            ).map(([value, label, hint]) => (
+              <button
+                key={value}
+                type="button"
+                title={hint}
+                disabled={scanning}
+                onClick={() => {
+                  setSensitivity(value);
+                  setShowingSample(false);
+                  void handleScan(value);
+                }}
+                className={`rounded-lg px-3 py-1.5 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                  sensitivity === value
+                    ? "bg-emerald-600 text-black"
+                    : "bg-slate-800 text-slate-400 hover:bg-slate-700"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Broad shows more names by accepting shallower dips and lower scores, so
+            expect weaker signals alongside the good ones. Changing this reruns the
+            scan.
+          </p>
+        </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
           {(
@@ -674,7 +715,7 @@ export default function BestStocksPicker() {
               onClick={() => setDirectionFilter(value)}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 directionFilter === value
-                  ? "bg-blue-600 text-white"
+                  ? "bg-blue-600 text-black"
                   : "bg-slate-800 text-slate-400 hover:bg-slate-700"
               }`}
             >
@@ -697,7 +738,7 @@ export default function BestStocksPicker() {
               onClick={() => setTimingFilter(value)}
               className={`rounded-lg px-3 py-1.5 text-sm transition ${
                 timingFilter === value
-                  ? "bg-violet-600 text-white"
+                  ? "bg-violet-600 text-black"
                   : "bg-slate-800 text-slate-400 hover:bg-slate-700"
               }`}
             >
@@ -727,10 +768,20 @@ export default function BestStocksPicker() {
 
       {!scanning && candidates.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-white">
-            Top Picks ({filteredCandidates.length} shown · {longCount} long ·{" "}
-            {shortCount} short)
-          </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-white">
+              Top Picks ({filteredCandidates.length} shown · {longCount} long ·{" "}
+              {shortCount} short)
+            </h3>
+            {scannedCount !== null && (
+              <p className="mt-1 text-xs text-slate-500">
+                {candidates.length} setup{candidates.length === 1 ? "" : "s"} found
+                across {scannedCount} symbols scanned.
+                {sensitivity !== "broad" &&
+                  " Switch to Broad to loosen the screen and see more."}
+              </p>
+            )}
+          </div>
           {filteredCandidates.length === 0 ? (
             <EmptyState
               icon={Filter}
@@ -751,8 +802,12 @@ export default function BestStocksPicker() {
       {!scanning && candidates.length === 0 && !error && (
         <EmptyState
           icon={Sparkles}
-          title="No picks yet"
-          description="Run a scan to rank long dip-buy and short opportunities by recovery score, with buy timing and predicted bounce dates."
+          title={scannedCount === null ? "No picks yet" : "Nothing cleared the screen"}
+          description={
+            scannedCount === null
+              ? "Run a scan to rank long dip-buy and short opportunities by recovery score, with buy timing and predicted bounce dates."
+              : `Scanned ${scannedCount} symbols and none met the ${sensitivity} threshold — common when the market is calm. Switch to Broad to see weaker setups.`
+          }
         />
       )}
     </div>

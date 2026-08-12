@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/lib/rate-limit";
-import { scanForDips } from "@/lib/dip-scanner";
+import { DIP_SENSITIVITY, scanForDips } from "@/lib/dip-scanner";
+import type { DipSensitivity } from "@/lib/types";
+
+function asSensitivity(value: unknown): DipSensitivity {
+  return typeof value === "string" && value in DIP_SENSITIVITY
+    ? (value as DipSensitivity)
+    : "balanced";
+}
 
 export const dynamic = "force-dynamic";
 // A full scan fans out across the universe; the platform default is too short.
@@ -13,13 +20,13 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       symbols?: string[];
-      minScore?: number;
+      sensitivity?: string;
       symbolsOnly?: boolean;
     };
 
     const result = await scanForDips(
       body.symbols ?? [],
-      body.minScore ?? 20,
+      asSensitivity(body.sensitivity),
       body.symbolsOnly ?? false
     );
 
@@ -38,7 +45,7 @@ export async function GET(request: Request) {
   if (limited) return limited;
 
   try {
-    const result = await scanForDips([], 20);
+    const result = await scanForDips([], "balanced");
     return NextResponse.json(result, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });

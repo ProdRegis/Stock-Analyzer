@@ -1,29 +1,30 @@
+/**
+ * Symbols the scanners sweep when no specific ticker is given.
+ *
+ * Breadth is what makes a scan useful: only a fraction of names are dipping or
+ * near a breakout on any given day, so a small universe returns almost nothing
+ * in a calm market. Kept to liquid large caps spread across sectors, since
+ * thin names produce unreliable support levels and noisy signals.
+ */
 export const DEFAULT_SCAN_UNIVERSE = [
-  "AAPL",
-  "MSFT",
-  "GOOGL",
-  "AMZN",
-  "NVDA",
-  "META",
-  "TSLA",
-  "AMD",
-  "NFLX",
-  "CRM",
-  "JPM",
-  "V",
-  "MA",
-  "DIS",
-  "PYPL",
-  "INTC",
-  "QCOM",
-  "AVGO",
-  "COST",
-  "UNH",
-  "BA",
-  "XOM",
-  "LLY",
-  "WMT",
-  "ORCL",
+  // Technology
+  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "AVGO", "ORCL",
+  "CRM", "ADBE", "AMD", "INTC", "QCOM", "TXN", "MU", "AMAT", "NFLX", "CSCO",
+  "IBM", "NOW", "INTU", "PANW", "SNOW", "UBER", "ABNB", "SHOP", "PLTR", "ARM",
+  // Financials
+  "JPM", "BAC", "WFC", "GS", "MS", "V", "MA", "AXP", "SCHW", "BLK", "C",
+  "PYPL", "COIN",
+  // Healthcare
+  "UNH", "LLY", "JNJ", "ABBV", "MRK", "PFE", "TMO", "ABT", "DHR", "AMGN",
+  "BMY", "CVS", "ISRG",
+  // Consumer
+  "WMT", "COST", "HD", "PG", "KO", "PEP", "MCD", "NKE", "SBUX", "TGT", "LOW",
+  "DIS", "CMG",
+  // Industrials and energy
+  "BA", "CAT", "GE", "HON", "UPS", "LMT", "RTX", "DE", "XOM", "CVX", "COP",
+  "SLB",
+  // Utilities, real estate, materials
+  "NEE", "DUK", "SO", "AMT", "PLD", "LIN",
 ];
 
 export const PORTFOLIO_STORAGE_KEY = "portfolio-risk-analyzer:saved-portfolios";

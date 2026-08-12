@@ -103,6 +103,17 @@ export interface BreakoutCandidate {
 
 export type TradeDirection = "long" | "short";
 
+/** How strict the dip scanner's screen is. Thresholds live in the scanner. */
+export type DipSensitivity = "strict" | "balanced" | "broad";
+
+/** Selectable spans on a price chart. */
+export type ChartRange = "1D" | "7D" | "1M" | "3M" | "1Y" | "5Y";
+
+export const CHART_RANGES: ChartRange[] = ["1D", "7D", "1M", "3M", "1Y", "5Y"];
+
+/** Bar sizes the chart endpoint can return. */
+export type ChartInterval = "1m" | "15m" | "1d" | "1wk";
+
 export type BuyTimingWindow =
   | "now"
   | "tomorrow"

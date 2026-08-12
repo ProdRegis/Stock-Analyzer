@@ -27,7 +27,11 @@ resistance and how past breakouts resolved. Search accepts either a ticker or a
 company name.
 
 **Dips & Shorts** — Finds oversold candidates and pairs each one with an entry
-case, expected timing, and a stop level.
+case, expected timing, and a stop level. Sweeps a universe of roughly 85 liquid
+large caps plus the day's trending symbols. A strict/balanced/broad control sets
+how weak a setup may be and still show up, since on a calm day very little
+clears the default screen. The top 12 picks refresh every second; the rest hold
+their scan-time values so the poll payload stays bounded.
 
 **Safety Stops** — Recommends a stop-loss price for every holding at once, with
 the reasoning behind each. Several candidates are evaluated — support
@@ -40,8 +44,21 @@ printing a number.
 filtered to the symbols you actually hold.
 
 Across all tabs: portfolios are saved in the browser and restored on return,
-charts support range selection and plot your cost basis, and the header shows
-live market status alongside a countdown to the next open or close.
+charts plot your cost basis, and the header shows live market status alongside a
+countdown to the next open or close.
+
+### Chart Ranges
+
+Every price chart offers 1D, 7D, 1M, 3M, 1Y, and 5Y. Bar size scales with the
+span — one-minute bars for a single day, fifteen-minute for a week, daily for
+the middle spans, weekly for five years — so no chart carries more than a few
+hundred points.
+
+The 1M, 3M, and 1Y spans are cut from the two years of daily bars the page
+already holds, so switching between them costs no requests and keeps the moving
+averages continuous. Only 1D, 7D, and 5Y call `/api/chart`, and each response is
+cached server-side. Moving averages are hidden outside the daily spans, since a
+"20-period" line means something different on weekly or one-minute bars.
 
 ### Profiles
 
@@ -182,6 +199,23 @@ enforcement, the password gate, profile isolation and migration, market hours
 across weekends and both daylight and standard time, and both import parsers
 including the comma-versus-digit-grouping ambiguity in pasted tables.
 
+## Theming
+
+The palette follows Robinhood: true black chrome, green for gains and primary
+actions, an orange-red for losses.
+
+It is implemented by redefining Tailwind's color scales in `src/app/globals.css`
+rather than renaming classes throughout the app, so a single file drives the
+whole theme. The catch is that the family names no longer describe the hue —
+`blue` is the green primary, `violet` is the lime highlight. The block at the
+top of that file maps each family to its role. Change a value there and it
+propagates everywhere; adding a new component means picking the family by role,
+not by color name.
+
+Solid fills carry black text rather than white. Robinhood's own buttons read
+that way, and white on a bright green sits around 3:1 contrast, which is below
+the readable threshold for body-sized text.
+
 ## Stack
 
 - Next.js 16 + React 19 + TypeScript
@@ -189,3 +223,7 @@ including the comma-versus-digit-grouping ambiguity in pasted tables.
 - [yahoo-finance2](https://github.com/gadicc/yahoo-finance2) for market data
 - Recharts for visualization
 - Vitest for tests
+
+## Credits
+
+Made by Regis.

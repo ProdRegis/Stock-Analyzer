@@ -2,6 +2,7 @@
 
 import Dashboard from "./Dashboard";
 import Header from "./Header";
+import MadeByTag from "./MadeByTag";
 import ProfileGate from "./ProfileGate";
 import { usePersistentStore } from "@/hooks/usePersistentStore";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
@@ -22,6 +23,7 @@ export default function AppShell() {
     return (
       <div className="min-h-screen bg-slate-950">
         <ProfileGate />
+        <MadeByTag />
       </div>
     );
   }
@@ -33,6 +35,8 @@ export default function AppShell() {
       <main className="px-4 py-8 sm:px-6">
         <Dashboard />
       </main>
+
+      <MadeByTag />
     </div>
   );
 }

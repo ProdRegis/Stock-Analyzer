@@ -165,7 +165,7 @@ export default function LiveMarketModal({ open, onClose }: LiveMarketModalProps)
               type="button"
               onClick={handleSearch}
               disabled={loadingDetails}
-              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+              className="rounded-xl bg-blue-600 px-5 py-2 text-sm font-medium text-black transition hover:bg-blue-500 disabled:opacity-50"
             >
               {loadingDetails ? "Loading..." : "Search"}
             </button>
@@ -285,21 +285,17 @@ export default function LiveMarketModal({ open, onClose }: LiveMarketModalProps)
 
               <div>
                 <h4 className="mb-2 text-sm font-medium text-slate-400">
-                  Today&apos;s Intraday Chart (1-minute bars)
+                  Price Chart
                 </h4>
-                {selected.intradayHistory.length > 0 ? (
-                  <PriceChart
-                    history={selected.intradayHistory}
-                    symbol={selected.symbol}
-                    mode="intraday"
-                    showMovingAverages={false}
-                    heightClassName="h-64"
-                  />
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    Intraday data is not available right now.
-                  </p>
-                )}
+                {/* No daily series here, so spans past today load on demand. */}
+                <PriceChart
+                  history={[]}
+                  intradayHistory={selected.intradayHistory}
+                  symbol={selected.symbol}
+                  defaultRange="1D"
+                  showMovingAverages={false}
+                  heightClassName="h-64"
+                />
               </div>
             </div>
           )}

@@ -26,6 +26,7 @@ import type { PricePoint } from "./types";
 import type {
   BuyTimingWindow,
   DipCandidate,
+  DipSensitivity,
   PastDipRecovery,
   ResistanceLevel,
   StopLossReasonDetail,
@@ -390,8 +391,31 @@ function predictShortTiming(
   };
 }
 
+export interface DipThresholds {
+  /** Minimum recovery score for a long to qualify. */
+  longScore: number;
+  /** Minimum drop from the recent high, in percent. */
+  longDipPercent: number;
+  /** Minimum score for a short setup to qualify. */
+  shortScore: number;
+}
+
+/**
+ * How much has to be wrong with a stock before it counts as a setup.
+ *
+ * On a quiet day almost nothing clears the strict bar, which is correct but
+ * looks like a broken scanner. Exposing the bar lets someone widen it and see
+ * the weaker setups, with the tradeoff stated rather than hidden.
+ */
+export const DIP_SENSITIVITY: Record<DipSensitivity, DipThresholds> = {
+  strict: { longScore: 35, longDipPercent: 6, shortScore: 40 },
+  balanced: { longScore: 20, longDipPercent: 3, shortScore: 25 },
+  broad: { longScore: 10, longDipPercent: 1.5, shortScore: 15 },
+};
+
 export async function scanStockForDip(
-  symbol: string
+  symbol: string,
+  thresholds: DipThresholds = DIP_SENSITIVITY.balanced
 ): Promise<DipCandidate[]> {
   const upperSymbol = symbol.toUpperCase();
   const lastUpdated = new Date().toISOString();
@@ -449,7 +473,10 @@ export async function scanStockForDip(
 
     const candidates: DipCandidate[] = [];
 
-    if (longScoring.score >= 20 && longScoring.dipPercent >= 3) {
+    if (
+      longScoring.score >= thresholds.longScore &&
+      longScoring.dipPercent >= thresholds.longDipPercent
+    ) {
       const nearestResistance =
         resistanceLevels
           .filter((level) => level.price >= base.currentPrice * 0.98)
@@ -479,7 +506,7 @@ export async function scanStockForDip(
       });
     }
 
-    if (shortScoring.score >= 25) {
+    if (shortScoring.score >= thresholds.shortScore) {
       const timing = predictShortTiming(
         shortScoring,
         marketContext,
@@ -533,25 +560,44 @@ async function runWithConcurrency<T, R>(
 
 export async function scanForDips(
   extraSymbols: string[] = [],
-  minScore = 20,
+  sensitivity: DipSensitivity = "balanced",
   symbolsOnly = false
-): Promise<{ scannedAt: string; candidates: DipCandidate[] }> {
+): Promise<{
+  scannedAt: string;
+  scanned: number;
+  sensitivity: DipSensitivity;
+  candidates: DipCandidate[];
+}> {
   const scannedAt = new Date().toISOString();
   const universe = await getScanUniverse(extraSymbols, { symbolsOnly });
-  const effectiveMinScore =
-    symbolsOnly && extraSymbols.length > 0 ? 0 : minScore;
 
-  const nested = await runWithConcurrency(universe, 4, (symbol) =>
-    scanStockForDip(symbol)
+  // Someone who typed a ticker wants to see that stock's read, not be told it
+  // failed a screen they never chose, so an explicit lookup uses the widest bar.
+  const singleLookup = symbolsOnly && extraSymbols.length > 0;
+  const thresholds = singleLookup
+    ? DIP_SENSITIVITY.broad
+    : DIP_SENSITIVITY[sensitivity];
+
+  const nested = await runWithConcurrency(universe, 6, (symbol) =>
+    scanStockForDip(symbol, thresholds)
   );
+
+  // Both directions share one score field, so the floor is the lower bar;
+  // each direction was already screened on its own threshold above.
+  const scoreFloor = singleLookup
+    ? 0
+    : Math.min(thresholds.longScore, thresholds.shortScore);
 
   const candidates = rankDipCandidates(
-    nested
-      .flat()
-      .filter((candidate) => candidate.recoveryScore >= effectiveMinScore)
+    nested.flat().filter((candidate) => candidate.recoveryScore >= scoreFloor)
   );
 
-  return { scannedAt, candidates };
+  return {
+    scannedAt,
+    scanned: universe.length,
+    sensitivity: singleLookup ? "broad" : sensitivity,
+    candidates,
+  };
 }
 
 function quoteAsRecord(quote: unknown): Record<string, unknown> {

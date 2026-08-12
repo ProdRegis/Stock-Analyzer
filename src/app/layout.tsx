@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   title: "Portfolio Risk Analyzer",
   description:
     "Analyze your stock portfolio risk with Yahoo Finance data, moving averages, resistance levels, and breakout signals.",
+  authors: [{ name: "Regis" }],
+  creator: "Regis",
+};
+
+export const viewport: Viewport = {
+  colorScheme: "dark",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({

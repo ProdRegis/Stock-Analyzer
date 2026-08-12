@@ -47,7 +47,7 @@ export default function TabNav({ activeTab, onChange }: TabNavProps) {
             aria-current={active ? "page" : undefined}
             className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
               active
-                ? "bg-blue-600 text-white shadow-sm"
+                ? "bg-blue-600 text-black shadow-sm"
                 : "text-slate-400 hover:bg-slate-800 hover:text-white"
             }`}
           >

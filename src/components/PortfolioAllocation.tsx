@@ -4,17 +4,21 @@ import { ChartPie } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import type { PortfolioAnalysis } from "@/lib/types";
 
+/**
+ * Greens, cyans, and golds only. Red is reserved for losses elsewhere in the
+ * app, so a red slice here would read as a losing position rather than a color.
+ */
 const SLICE_COLORS = [
-  "#3b82f6",
-  "#22d3ee",
-  "#a78bfa",
-  "#f97316",
-  "#34d399",
-  "#f472b6",
-  "#facc15",
-  "#60a5fa",
-  "#fb7185",
-  "#4ade80",
+  "#00c805",
+  "#33d9ff",
+  "#ccff00",
+  "#ffd426",
+  "#5ce570",
+  "#00c8f0",
+  "#b8e600",
+  "#95efa4",
+  "#7ce8ff",
+  "#f5c400",
 ];
 
 function formatCurrency(value: number) {
@@ -72,8 +76,8 @@ export default function PortfolioAllocation({
               </Pie>
               <Tooltip
                 contentStyle={{
-                  background: "#0f172a",
-                  border: "1px solid #334155",
+                  background: "#131417",
+                  border: "1px solid #2b3137",
                   borderRadius: 8,
                   fontSize: 12,
                 }}
