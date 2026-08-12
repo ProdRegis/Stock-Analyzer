@@ -15,13 +15,12 @@ The dashboard is organized into five tabs.
 average cost. Returns a weighted risk score built from volatility, beta,
 drawdown, diversification, and concentration, plus unrealized P&L when cost
 basis is provided. Includes an allocation breakdown and a correlation heatmap
-showing how much your holdings actually move together. Holdings can also be
-imported from a screenshot — see [Importing from a photo](#importing-from-a-photo).
+showing how much your holdings actually move together. Positions can be typed
+in or pasted in bulk — see [Importing holdings](#importing-holdings).
 
 Average cost is the price paid per share. It is optional: leave it blank and
 the risk metrics still work, but you lose unrealized P&L, the break-even line
-on charts, and the Safety Stops tab's read on whether a stop locks in a gain. Holdings can also be
-imported from a screenshot — see [Importing from a screenshot](#importing-from-a-screenshot).
+on charts, and the Safety Stops tab's read on whether a stop locks in a gain.
 
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
 resistance and how past breakouts resolved. Search accepts either a ticker or a
@@ -57,22 +56,17 @@ what controls access, and profiles only decide whose holdings are displayed.
 
 ### Importing holdings
 
-Two ways in, so retyping positions by hand is never necessary.
+**Paste holdings** takes a table copied off a brokerage page, CSV or TSV from a
+spreadsheet, loose lines like `AAPL 12 178.40`, or JSON. Column order is
+ticker, shares, average cost, and the cost is optional. It runs entirely in the
+browser, so it needs no API key and costs nothing.
 
-**Paste text** works with no configuration and no cost. It accepts a table
-copied off a brokerage page, CSV or TSV from a spreadsheet, loose lines like
-`AAPL 12 178.40`, and JSON. Column order is ticker, shares, average cost.
+Screenshots are handled without an OCR service: the dialog offers a copyable
+prompt to send to ChatGPT or Claude along with the image, and their reply
+pastes straight in. An existing chat subscription covers that, and parsing real
+text is more reliable than reading pixels.
 
-**Upload a photo** reads a screenshot directly, and needs `OPENAI_API_KEY`.
-Without the key the tab says so upfront rather than after a file is chosen, and
-points at pasting instead.
-
-A screenshot can still be imported for free without that key: send it to
-ChatGPT or Claude with the prompt the paste tab offers to copy, then paste the
-reply. A chat subscription covers this, and the result is *more* accurate than
-the API path, since the app then parses real text rather than a guess at pixels.
-
-Both paths converge on the same editable review table, and nothing reaches the
+Everything lands in an editable review table first, and nothing reaches the
 portfolio without passing through it. A misread share count or cost basis would
 silently distort every risk and P&L figure downstream, so implausible values are
 flagged, duplicate tickers are merged with a share-weighted average cost, and
@@ -123,9 +117,7 @@ only safe over HTTPS — deploy behind TLS, never plain HTTP.
 
 Push the repository to GitHub, import it at
 [vercel.com/new](https://vercel.com/new), and add `SITE_PASSWORD` under
-**Settings → Environment Variables** before the first deploy. Add
-`OPENAI_API_KEY` too if you want screenshot import; it is optional and the rest
-of the app is unaffected without it.
+**Settings → Environment Variables** before the first deploy.
 
 The scanner and batch endpoints fan out to many symbols, so they set
 `maxDuration = 60` to clear Vercel's default 10-second function timeout.

@@ -1,10 +1,12 @@
 /**
- * Turning a screenshot of a brokerage account into holdings.
+ * Validation shared by every route into the portfolio.
  *
- * OCR on financial tables misreads decimals and column boundaries often enough
- * that nothing here is trusted automatically. The model's output is validated
- * against strict shapes, anything suspicious is flagged, and the UI requires
- * the user to confirm every row before it reaches the portfolio.
+ * Imported rows arrive from text that was typed, copied out of a brokerage
+ * table, or transcribed from a screenshot by a chat assistant. None of those
+ * are trustworthy enough to apply directly: a misread share count or cost
+ * basis would silently distort every risk and P&L figure downstream. So rows
+ * are checked against strict shapes, anything implausible is flagged, and the
+ * UI requires confirmation before any of it reaches the portfolio.
  */
 
 import type { PortfolioHolding } from "./types";
@@ -26,22 +28,6 @@ const SYMBOL_PATTERN = /^[A-Z]{1,6}(?:[.-][A-Z]{1,2})?$/;
 /** Above this, a "share count" is more likely a misread dollar amount. */
 const IMPLAUSIBLE_SHARES = 1_000_000;
 const IMPLAUSIBLE_PRICE = 1_000_000;
-
-export const IMPORT_PROMPT = `You are reading a screenshot of a stock brokerage account or portfolio tracker.
-
-Extract every stock position you can see. For each one return:
-- "symbol": the ticker symbol, uppercase. If only a company name is shown, return its ticker.
-- "shares": the number of shares held, as a number. Fractional shares are allowed.
-- "avgCost": the average cost or purchase price PER SHARE, as a number. Omit this field if the screenshot does not show a per-share cost.
-
-Critical rules:
-- "avgCost" is the price of ONE share. If you only see a total position value, omit avgCost rather than dividing.
-- Do not confuse market value, daily change, or total gain with cost per share.
-- Do not guess. Omit any position you cannot read clearly.
-- Ignore cash balances, crypto, options, and account totals.
-
-Respond with JSON only, in exactly this shape:
-{"holdings":[{"symbol":"AAPL","shares":12,"avgCost":178.4}]}`;
 
 function coerceNumber(value: unknown): number | null {
   if (typeof value === "number") {
@@ -162,39 +148,3 @@ export function buildImportResult(
   return { holdings: merged, warnings };
 }
 
-export function parseImportResponse(raw: unknown): ImportResult {
-  if (typeof raw !== "object" || raw === null) {
-    return {
-      holdings: [],
-      warnings: ["Could not read anything from that image."],
-    };
-  }
-
-  const candidates = (raw as Record<string, unknown>).holdings;
-  if (!Array.isArray(candidates)) {
-    return { holdings: [], warnings: ["No positions found in that image."] };
-  }
-
-  return buildImportResult(candidates, "No positions found in that image.");
-}
-
-/** Pulls the JSON object out of a model reply that may be fenced or prefixed. */
-export function extractJson(content: string): unknown {
-  const trimmed = content.trim();
-
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // Fall through to locating an embedded object.
-  }
-
-  const start = trimmed.indexOf("{");
-  const end = trimmed.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-
-  try {
-    return JSON.parse(trimmed.slice(start, end + 1));
-  } catch {
-    return null;
-  }
-}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImageUp, Plus, Trash2, Wallet } from "lucide-react";
+import { ClipboardPaste, Plus, Trash2, Wallet } from "lucide-react";
 import PortfolioSymbolInput, {
   type PortfolioSymbolInputHandle,
 } from "./PortfolioSymbolInput";
@@ -199,8 +199,8 @@ export default function PortfolioInput({
           onClick={() => setImportOpen(true)}
           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
         >
-          <ImageUp className="h-4 w-4" aria-hidden="true" />
-          Import from photo
+          <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+          Paste holdings
         </button>
         <button
           type="submit"
