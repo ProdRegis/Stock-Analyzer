@@ -19,6 +19,17 @@ const ALLOWED_TYPES = new Set([
 const DEFAULT_MODEL = "gpt-4o";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
+/**
+ * Lets the UI find out whether image import is usable before asking someone to
+ * pick a file, rather than failing them after the upload.
+ */
+export async function GET() {
+  return NextResponse.json(
+    { configured: Boolean(process.env.OPENAI_API_KEY) },
+    { headers: { "Cache-Control": "no-store" } }
+  );
+}
+
 export async function POST(request: Request) {
   const limited = enforceRateLimit(request, "import");
   if (limited) return limited;

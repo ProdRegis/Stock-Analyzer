@@ -55,18 +55,28 @@ This is data separation, not authentication. Profiles have no passwords and
 anyone at the keyboard can select any of them — the shared site password is
 what controls access, and profiles only decide whose holdings are displayed.
 
-### Import from a photo
+### Importing holdings
 
-Rather than retyping positions, upload a screenshot of a brokerage account and
-the holdings are read out of it. Requires `OPENAI_API_KEY`; without it the
-button explains that the feature is off and nothing else is affected.
+Two ways in, so retyping positions by hand is never necessary.
 
-Extracted rows always land in an editable review table first. Reading numbers
-off an image is imperfect, and a misread share count or cost basis would
-silently distort every risk and P&L figure downstream, so nothing reaches the
-portfolio without being confirmed. Implausible values are flagged, duplicate
-tickers are merged with a share-weighted average cost, and unreadable rows are
-reported rather than guessed at.
+**Paste text** works with no configuration and no cost. It accepts a table
+copied off a brokerage page, CSV or TSV from a spreadsheet, loose lines like
+`AAPL 12 178.40`, and JSON. Column order is ticker, shares, average cost.
+
+**Upload a photo** reads a screenshot directly, and needs `OPENAI_API_KEY`.
+Without the key the tab says so upfront rather than after a file is chosen, and
+points at pasting instead.
+
+A screenshot can still be imported for free without that key: send it to
+ChatGPT or Claude with the prompt the paste tab offers to copy, then paste the
+reply. A chat subscription covers this, and the result is *more* accurate than
+the API path, since the app then parses real text rather than a guess at pixels.
+
+Both paths converge on the same editable review table, and nothing reaches the
+portfolio without passing through it. A misread share count or cost basis would
+silently distort every risk and P&L figure downstream, so implausible values are
+flagged, duplicate tickers are merged with a share-weighted average cost, and
+unreadable rows are reported rather than guessed at.
 
 ## Getting Started
 
@@ -173,12 +183,12 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-163 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+181 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation), technical indicators (RSI, ATR, moving averages, support and
 resistance), cache behavior including coalescing and stale-on-error, rate limit
 enforcement, the password gate, profile isolation and migration, market hours
-across weekends and both daylight and standard time, and the screenshot import
-parser.
+across weekends and both daylight and standard time, and both import parsers
+including the comma-versus-digit-grouping ambiguity in pasted tables.
 
 ## Stack
 

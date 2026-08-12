@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import {
   AlertTriangle,
+  Check,
+  ClipboardCopy,
   ImageUp,
   Loader2,
   Trash2,
@@ -10,6 +12,10 @@ import {
   X,
 } from "lucide-react";
 import type { ImportedHolding } from "@/lib/portfolio-import";
+import {
+  AI_TRANSCRIPTION_PROMPT,
+  parsePastedHoldings,
+} from "@/lib/portfolio-paste";
 import type { PortfolioHolding } from "@/lib/types";
 
 interface PortfolioImportModalProps {
@@ -19,6 +25,7 @@ interface PortfolioImportModalProps {
 }
 
 type Stage = "upload" | "reading" | "review";
+type Source = "paste" | "photo";
 
 const inputClass =
   "rounded-md border border-slate-600 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none";
@@ -28,11 +35,16 @@ export default function PortfolioImportModal({
   onClose,
   onApply,
 }: PortfolioImportModalProps) {
+  const [source, setSource] = useState<Source>("paste");
   const [stage, setStage] = useState<Stage>("upload");
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [rows, setRows] = useState<ImportedHolding[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [pasted, setPasted] = useState("");
+  const [promptCopied, setPromptCopied] = useState(false);
+  // null until asked; image import needs a server-side API key to work.
+  const [photoConfigured, setPhotoConfigured] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
@@ -43,6 +55,46 @@ export default function PortfolioImportModal({
     setWarnings([]);
     setRows([]);
     setDragging(false);
+    setPasted("");
+  }
+
+  function readPasted() {
+    const result = parsePastedHoldings(pasted);
+
+    if (result.holdings.length === 0) {
+      setError(result.warnings[0] ?? "Nothing recognisable in that text.");
+      return;
+    }
+
+    setError(null);
+    setRows(result.holdings);
+    setWarnings(result.warnings);
+    setStage("review");
+  }
+
+  async function selectPhotoTab() {
+    setSource("photo");
+    setError(null);
+    if (photoConfigured !== null) return;
+
+    try {
+      const response = await fetch("/api/portfolio/import-image");
+      const payload = await response.json();
+      setPhotoConfigured(Boolean(payload?.configured));
+    } catch {
+      // Treat an unreachable check as available; the upload reports the truth.
+      setPhotoConfigured(true);
+    }
+  }
+
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(AI_TRANSCRIPTION_PROMPT);
+      setPromptCopied(true);
+      window.setTimeout(() => setPromptCopied(false), 2_000);
+    } catch {
+      // Clipboard permission denied; the text is on screen to copy manually.
+    }
   }
 
   function close() {
@@ -125,7 +177,7 @@ export default function PortfolioImportModal({
             className="flex items-center gap-2 text-lg font-semibold text-white"
           >
             <ImageUp className="h-5 w-5 text-slate-500" aria-hidden="true" />
-            Import from a screenshot
+            Import your holdings
           </h2>
           <button
             type="button"
@@ -139,6 +191,131 @@ export default function PortfolioImportModal({
 
         <div className="max-h-[calc(85vh-8rem)] overflow-y-auto p-5">
           {stage === "upload" && (
+            <div className="mb-5 flex gap-1 rounded-lg bg-slate-900/60 p-1">
+              {(
+                [
+                  ["paste", "Paste text"],
+                  ["photo", "Upload a photo"],
+                ] as Array<[Source, string]>
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    if (id === "photo") {
+                      void selectPhotoTab();
+                      return;
+                    }
+                    setSource(id);
+                    setError(null);
+                  }}
+                  className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition ${
+                    source === id
+                      ? "bg-slate-700 text-white"
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {stage === "upload" && source === "paste" && (
+            <>
+              <textarea
+                value={pasted}
+                onChange={(event) => setPasted(event.target.value)}
+                rows={8}
+                placeholder={"AAPL, 12, 178.40\nMSFT, 6, 405.20\nNVDA, 15"}
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 font-mono text-sm text-white outline-none placeholder:text-slate-600 focus:border-blue-500"
+              />
+
+              <p className="mt-2 text-xs text-slate-500">
+                One position per line as ticker, shares, average cost. Average
+                cost is optional. Pasting a table copied from your brokerage
+                works too, as does JSON.
+              </p>
+
+              {error && (
+                <p className="mt-3 flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2.5 text-sm text-rose-300">
+                  <AlertTriangle
+                    className="mt-0.5 h-4 w-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  {error}
+                </p>
+              )}
+
+              <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+                <p className="text-sm font-medium text-white">
+                  Only have a screenshot?
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Send it to ChatGPT or Claude with the prompt below, then paste
+                  their reply into the box above. Your existing subscription
+                  covers it, and text is read more accurately than an image.
+                </p>
+                <button
+                  type="button"
+                  onClick={copyPrompt}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:bg-slate-800"
+                >
+                  {promptCopied ? (
+                    <>
+                      <Check
+                        className="h-3.5 w-3.5 text-emerald-400"
+                        aria-hidden="true"
+                      />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardCopy className="h-3.5 w-3.5" aria-hidden="true" />
+                      Copy the prompt
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={readPasted}
+                  disabled={pasted.trim() === ""}
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Read holdings
+                </button>
+              </div>
+            </>
+          )}
+
+          {stage === "upload" && source === "photo" && photoConfigured === false && (
+            <div className="rounded-xl border border-slate-700 bg-slate-900/40 px-6 py-10 text-center">
+              <ImageUp
+                className="mx-auto h-8 w-8 text-slate-600"
+                aria-hidden="true"
+              />
+              <p className="mt-3 text-sm font-medium text-white">
+                Reading images is turned off
+              </p>
+              <p className="mx-auto mt-1 max-w-sm text-xs text-slate-400">
+                It needs a paid AI vision service, which this site is not
+                configured with. Use the paste tab instead — send your
+                screenshot to ChatGPT or Claude and paste their reply.
+              </p>
+              <button
+                type="button"
+                onClick={() => setSource("paste")}
+                className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+              >
+                Switch to pasting
+              </button>
+            </div>
+          )}
+
+          {stage === "upload" && source === "photo" && photoConfigured !== false && (
             <>
               <div
                 onDragOver={(event) => {

@@ -106,18 +106,16 @@ function mergeDuplicates(holdings: ImportedHolding[]): ImportedHolding[] {
   return [...bySymbol.values()];
 }
 
-export function parseImportResponse(raw: unknown): ImportResult {
+/**
+ * Validates raw rows into holdings, flagging the implausible and merging
+ * duplicates. Shared by both import paths so a screenshot and a pasted table
+ * get identical scrutiny.
+ */
+export function buildImportResult(
+  candidates: unknown[],
+  emptyMessage = "No positions found."
+): ImportResult {
   const warnings: string[] = [];
-
-  if (typeof raw !== "object" || raw === null) {
-    return { holdings: [], warnings: ["Could not read anything from that image."] };
-  }
-
-  const candidates = (raw as Record<string, unknown>).holdings;
-  if (!Array.isArray(candidates)) {
-    return { holdings: [], warnings: ["No positions found in that image."] };
-  }
-
   const holdings: ImportedHolding[] = [];
   let skipped = 0;
 
@@ -158,10 +156,26 @@ export function parseImportResponse(raw: unknown): ImportResult {
   const merged = mergeDuplicates(holdings);
 
   if (merged.length === 0 && warnings.length === 0) {
-    warnings.push("No positions found in that image.");
+    warnings.push(emptyMessage);
   }
 
   return { holdings: merged, warnings };
+}
+
+export function parseImportResponse(raw: unknown): ImportResult {
+  if (typeof raw !== "object" || raw === null) {
+    return {
+      holdings: [],
+      warnings: ["Could not read anything from that image."],
+    };
+  }
+
+  const candidates = (raw as Record<string, unknown>).holdings;
+  if (!Array.isArray(candidates)) {
+    return { holdings: [], warnings: ["No positions found in that image."] };
+  }
+
+  return buildImportResult(candidates, "No positions found in that image.");
 }
 
 /** Pulls the JSON object out of a model reply that may be fenced or prefixed. */
