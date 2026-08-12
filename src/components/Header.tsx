@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ChartCandlestick } from "lucide-react";
 import LiveMarketModal from "./LiveMarketModal";
+import MarketCountdown from "./MarketCountdown";
+import ProfileMenu from "./ProfileMenu";
 import { formatMarketState } from "@/lib/format";
 
 type StatusTone = {
@@ -93,23 +95,29 @@ export default function Header() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setMarketOpen(true)}
-            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${tone.chip}`}
-          >
-            <span className="relative flex h-2 w-2">
-              {tone.pulse && (
+          <div className="flex items-center gap-3">
+            <MarketCountdown marketState={marketState} />
+
+            <button
+              type="button"
+              onClick={() => setMarketOpen(true)}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition ${tone.chip}`}
+            >
+              <span className="relative flex h-2 w-2">
+                {tone.pulse && (
+                  <span
+                    className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${tone.dot}`}
+                  />
+                )}
                 <span
-                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${tone.dot}`}
+                  className={`relative inline-flex h-2 w-2 rounded-full ${tone.dot}`}
                 />
-              )}
-              <span
-                className={`relative inline-flex h-2 w-2 rounded-full ${tone.dot}`}
-              />
-            </span>
-            {label}
-          </button>
+              </span>
+              {label}
+            </button>
+
+            <ProfileMenu />
+          </div>
         </div>
       </header>
 

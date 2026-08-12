@@ -4,12 +4,30 @@ import {
   WORKING_PORTFOLIO_STORAGE_KEY,
 } from "./constants";
 import { createPersistentStore } from "./persistent-store";
+import {
+  activeProfileStore,
+  profileScopedKey,
+  registerProfileScopedStore,
+} from "./profiles";
+
+/**
+ * Resolves the storage key for the active profile, or null when nobody is
+ * signed in. Reads then return empty and writes become no-ops, so a logged-out
+ * screen can never read or overwrite someone else's holdings.
+ */
+function activeKey(baseKey: string): string | null {
+  const profileId = activeProfileStore.getSnapshot();
+  return profileId === null ? null : profileScopedKey(baseKey, profileId);
+}
 
 export function loadSavedPortfolios(): SavedPortfolio[] {
   if (typeof window === "undefined") return [];
 
+  const key = activeKey(PORTFOLIO_STORAGE_KEY);
+  if (key === null) return [];
+
   try {
-    const raw = localStorage.getItem(PORTFOLIO_STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as SavedPortfolio[];
     return Array.isArray(parsed) ? parsed : [];
@@ -19,7 +37,16 @@ export function loadSavedPortfolios(): SavedPortfolio[] {
 }
 
 export function persistPortfolios(portfolios: SavedPortfolio[]): void {
-  localStorage.setItem(PORTFOLIO_STORAGE_KEY, JSON.stringify(portfolios));
+  if (typeof window === "undefined") return;
+
+  const key = activeKey(PORTFOLIO_STORAGE_KEY);
+  if (key === null) return;
+
+  try {
+    localStorage.setItem(key, JSON.stringify(portfolios));
+  } catch {
+    // Storage can be full or blocked; the list still works in memory.
+  }
 }
 
 export function savePortfolio(portfolio: SavedPortfolio): SavedPortfolio[] {
@@ -56,8 +83,11 @@ function isHolding(value: unknown): value is PortfolioHolding {
 export function loadWorkingPortfolio(): PortfolioHolding[] | null {
   if (typeof window === "undefined") return null;
 
+  const key = activeKey(WORKING_PORTFOLIO_STORAGE_KEY);
+  if (key === null) return null;
+
   try {
-    const raw = localStorage.getItem(WORKING_PORTFOLIO_STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
@@ -83,11 +113,11 @@ export function saveWorkingPortfolio(
 ): void {
   if (typeof window === "undefined" || holdings === null) return;
 
+  const key = activeKey(WORKING_PORTFOLIO_STORAGE_KEY);
+  if (key === null) return;
+
   try {
-    localStorage.setItem(
-      WORKING_PORTFOLIO_STORAGE_KEY,
-      JSON.stringify(holdings)
-    );
+    localStorage.setItem(key, JSON.stringify(holdings));
   } catch {
     // Storage can be full or blocked; the editor still works in-memory.
   }
@@ -103,3 +133,6 @@ export const savedPortfoliosStore = createPersistentStore<SavedPortfolio[]>(
   persistPortfolios,
   []
 );
+
+registerProfileScopedStore(workingPortfolioStore);
+registerProfileScopedStore(savedPortfoliosStore);

@@ -32,6 +32,11 @@ export const RATE_LIMITS = {
   analyze: { perMinute: 30, burst: 10 },
   search: { perMinute: 60, burst: 15 },
   read: { perMinute: 120, burst: 30 },
+  /**
+   * Image import is the only route that spends real money per call, so it is
+   * metered far tighter than anything else here.
+   */
+  import: { perMinute: 5, burst: 2 },
 } as const satisfies Record<string, RateLimitRule>;
 
 const MAX_BUCKETS = 10_000;

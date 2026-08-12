@@ -15,7 +15,13 @@ The dashboard is organized into five tabs.
 average cost. Returns a weighted risk score built from volatility, beta,
 drawdown, diversification, and concentration, plus unrealized P&L when cost
 basis is provided. Includes an allocation breakdown and a correlation heatmap
-showing how much your holdings actually move together.
+showing how much your holdings actually move together. Holdings can also be
+imported from a screenshot — see [Importing from a photo](#importing-from-a-photo).
+
+Average cost is the price paid per share. It is optional: leave it blank and
+the risk metrics still work, but you lose unrealized P&L, the break-even line
+on charts, and the Safety Stops tab's read on whether a stop locks in a gain. Holdings can also be
+imported from a screenshot — see [Importing from a screenshot](#importing-from-a-screenshot).
 
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
 resistance and how past breakouts resolved. Search accepts either a ticker or a
@@ -35,8 +41,32 @@ printing a number.
 filtered to the symbols you actually hold.
 
 Across all tabs: portfolios are saved in the browser and restored on return,
-charts support range selection and plot your cost basis, and a live market
-status indicator shows whether the session is open.
+charts support range selection and plot your cost basis, and the header shows
+live market status alongside a countdown to the next open or close.
+
+### Profiles
+
+People sharing a computer each get their own profile, selected from the header
+menu. Switching swaps the entire set of saved and in-progress portfolios, and
+logging out returns to a picker so the next person's data is not sitting on
+screen. The menu also shows how long the current profile has been signed in.
+
+This is data separation, not authentication. Profiles have no passwords and
+anyone at the keyboard can select any of them — the shared site password is
+what controls access, and profiles only decide whose holdings are displayed.
+
+### Import from a photo
+
+Rather than retyping positions, upload a screenshot of a brokerage account and
+the holdings are read out of it. Requires `OPENAI_API_KEY`; without it the
+button explains that the feature is off and nothing else is affected.
+
+Extracted rows always land in an editable review table first. Reading numbers
+off an image is imperfect, and a misread share count or cost basis would
+silently distort every risk and P&L figure downstream, so nothing reaches the
+portfolio without being confirmed. Implausible values are flagged, duplicate
+tickers are merged with a share-weighted average cost, and unreadable rows are
+reported rather than guessed at.
 
 ## Getting Started
 
@@ -83,7 +113,9 @@ only safe over HTTPS — deploy behind TLS, never plain HTTP.
 
 Push the repository to GitHub, import it at
 [vercel.com/new](https://vercel.com/new), and add `SITE_PASSWORD` under
-**Settings → Environment Variables** before the first deploy.
+**Settings → Environment Variables** before the first deploy. Add
+`OPENAI_API_KEY` too if you want screenshot import; it is optional and the rest
+of the app is unaffected without it.
 
 The scanner and batch endpoints fan out to many symbols, so they set
 `maxDuration = 60` to clear Vercel's default 10-second function timeout.
@@ -124,7 +156,16 @@ regardless of traffic.
 
 **Persistence.** Saved portfolios use `useSyncExternalStore` over
 `localStorage` (`src/lib/persistent-store.ts`) rather than an effect, which
-avoids hydration mismatches between server and client render.
+avoids hydration mismatches between server and client render. Storage keys are
+namespaced per profile; switching profiles reloads every scoped store rather
+than leaving a cached snapshot of the previous person's data on screen.
+Pre-profile data is migrated into a first profile on upgrade so nothing is lost.
+
+**Market clock.** The countdown is computed from the Eastern-time wall clock
+(`src/lib/market-hours.ts`) rather than polled, so it ticks every second with
+no network cost. It knows regular hours and weekends but not holidays, so it
+is reconciled against the live market state from the quote feed — when the two
+disagree the feed wins and the countdown is hidden rather than shown wrong.
 
 ## Testing
 
@@ -132,10 +173,12 @@ avoids hydration mismatches between server and client render.
 npm test
 ```
 
-103 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+163 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation), technical indicators (RSI, ATR, moving averages, support and
 resistance), cache behavior including coalescing and stale-on-error, rate limit
-enforcement, and the password gate.
+enforcement, the password gate, profile isolation and migration, market hours
+across weekends and both daylight and standard time, and the screenshot import
+parser.
 
 ## Stack
 

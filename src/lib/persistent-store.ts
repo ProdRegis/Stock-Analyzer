@@ -8,6 +8,12 @@ export interface PersistentStore<T> {
   set: (value: T) => void;
   /** Adopt a value that some other code path already persisted. */
   sync: (value: T) => void;
+  /**
+   * Discard the cached snapshot and read storage again. Needed when the key
+   * being read from changes underneath the store, as it does on a profile
+   * switch — without this the store keeps serving the previous profile's data.
+   */
+  reload: () => void;
 }
 
 /**
@@ -65,6 +71,12 @@ export function createPersistentStore<T>(
     sync(value) {
       loaded = true;
       snapshot = value;
+      emit();
+    },
+
+    reload() {
+      loaded = true;
+      snapshot = read();
       emit();
     },
   };

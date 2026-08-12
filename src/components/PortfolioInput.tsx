@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
-import { Plus, Trash2, Wallet } from "lucide-react";
+import { useRef, useState } from "react";
+import { ImageUp, Plus, Trash2, Wallet } from "lucide-react";
 import PortfolioSymbolInput, {
   type PortfolioSymbolInputHandle,
 } from "./PortfolioSymbolInput";
+import PortfolioImportModal from "./PortfolioImportModal";
 import type { PortfolioHolding } from "@/lib/types";
 
 interface PortfolioInputProps {
@@ -24,6 +25,7 @@ export default function PortfolioInput({
   loading,
 }: PortfolioInputProps) {
   const symbolInputRefs = useRef<Array<PortfolioSymbolInputHandle | null>>([]);
+  const [importOpen, setImportOpen] = useState(false);
 
   function updateShares(index: number, value: string) {
     onHoldingsChange(
@@ -65,6 +67,27 @@ export default function PortfolioInput({
   function removeRow(index: number) {
     onHoldingsChange(holdings.filter((_, i) => i !== index));
     symbolInputRefs.current.splice(index, 1);
+  }
+
+  function applyImported(
+    imported: PortfolioHolding[],
+    mode: "replace" | "append"
+  ) {
+    if (mode === "replace") {
+      onHoldingsChange(imported);
+      return;
+    }
+
+    // Appending onto blank starter rows would leave empty rows behind.
+    const existing = holdings.filter(
+      (row) => row.symbol.trim().length > 0 && row.shares > 0
+    );
+    const seen = new Set(existing.map((row) => row.symbol.toUpperCase()));
+
+    onHoldingsChange([
+      ...existing,
+      ...imported.filter((row) => !seen.has(row.symbol.toUpperCase())),
+    ]);
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -172,6 +195,14 @@ export default function PortfolioInput({
           Add Stock
         </button>
         <button
+          type="button"
+          onClick={() => setImportOpen(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white"
+        >
+          <ImageUp className="h-4 w-4" aria-hidden="true" />
+          Import from photo
+        </button>
+        <button
           type="submit"
           disabled={loading}
           className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
@@ -179,6 +210,12 @@ export default function PortfolioInput({
           {loading ? "Analyzing..." : "Analyze Portfolio"}
         </button>
       </div>
+
+      <PortfolioImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onApply={applyImported}
+      />
     </form>
   );
 }
