@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020617;
+  --foreground: #f1f5f9;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/*
+ * Elevation tiers. Higher tier = more important, lighter surface, stronger border.
+ * Tier 1 is reserved for the single most important panel on a screen.
+ */
+.surface-1 {
+  background-color: color-mix(in oklab, #1e293b 55%, transparent);
+  border: 1px solid color-mix(in oklab, #64748b 45%, transparent);
+  box-shadow:
+    0 1px 0 0 rgb(255 255 255 / 0.04) inset,
+    0 8px 24px -12px rgb(0 0 0 / 0.6);
+}
+
+.surface-2 {
+  background-color: color-mix(in oklab, #0f172a 65%, transparent);
+  border: 1px solid color-mix(in oklab, #475569 40%, transparent);
+}
+
+/* Recessed: for tiles nested inside a card. */
+.surface-3 {
+  background-color: color-mix(in oklab, #020617 45%, transparent);
+  border: 1px solid color-mix(in oklab, #334155 35%, transparent);
+}
+
+/* Visible keyboard focus everywhere, without adding a ring on mouse clicks. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
