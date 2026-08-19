@@ -89,22 +89,155 @@ export function formatCalendarDate(value: string): string {
   });
 }
 
+/** At least this far above the live price so the target is not already being tested. */
+export const SUGGEST_MIN_GAP = 0.01;
+/** Ignore resistance farther than this — that is not a weekly take-profit. */
+export const SUGGEST_WEEKLY_GAP = 0.08;
+/** Fallback when there is no nearby shelf. */
+export const SUGGEST_DEFAULT_BUFFER = 0.03;
+/** Gaps above this use next Friday instead of this Friday. */
+export const SUGGEST_NEAR_GAP = 0.04;
+
+export interface SuggestedSellPlan {
+  targetPrice: number;
+  targetDate: string;
+  dateLabel: string;
+  summary: string;
+  reason: string;
+  source: "resistance" | "buffer";
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addCalendarDays(date: Date, days: number): Date {
+  const next = startOfLocalDay(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+/** This week's Friday, or the coming Friday when the weekend has started. */
+export function upcomingFriday(now: Date): Date {
+  const today = startOfLocalDay(now);
+  const add = (5 - today.getDay() + 7) % 7;
+  return addCalendarDays(today, add);
+}
+
+export function formatFridayLabel(date: Date, now: Date): string {
+  const today = startOfLocalDay(now);
+  const due = startOfLocalDay(date);
+  const daysUntil = Math.round((due.getTime() - today.getTime()) / MS_PER_DAY);
+
+  if (daysUntil === 0) return "today (Friday)";
+  if (daysUntil > 0 && daysUntil <= 5) return "this Friday";
+  if (daysUntil > 5 && daysUntil <= 12) return "next Friday";
+
+  return due.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+export function roundTakeProfit(price: number, minPrice: number): number {
+  const snap = (value: number, step: number) => Math.round(value / step) * step;
+  const step = price >= 100 ? 1 : price >= 20 ? 0.5 : 0.05;
+  let rounded = snap(price, step);
+
+  if (rounded < minPrice) {
+    rounded = Math.ceil(minPrice / step - 1e-9) * step;
+  }
+
+  return Number(rounded.toFixed(2));
+}
+
+function nearbyResistance(
+  currentPrice: number,
+  resistanceLevels: Array<{ price: number }>
+): number | undefined {
+  const min = currentPrice * (1 + SUGGEST_MIN_GAP);
+  const max = currentPrice * (1 + SUGGEST_WEEKLY_GAP);
+
+  const above = resistanceLevels
+    .map((level) => level.price)
+    .filter((price) => Number.isFinite(price) && price >= min && price <= max)
+    .sort((a, b) => a - b);
+
+  return above[0];
+}
+
 /**
- * Nearest resistance at least 1% above the live price. Closer shelves are
- * already being tested, so they make a poor take-profit.
+ * Weekly take-profit: nearby resistance when there is one, otherwise about 3%
+ * up, paired with this Friday or next Friday.
  */
+export function suggestSellPlan(input: {
+  currentPrice: number;
+  resistanceLevels: Array<{ price: number }>;
+  now?: Date;
+}): SuggestedSellPlan | null {
+  const current = input.currentPrice;
+  if (!Number.isFinite(current) || current <= 0) return null;
+
+  const now = input.now ?? new Date();
+  const resistance = nearbyResistance(current, input.resistanceLevels);
+  const raw = resistance ?? current * (1 + SUGGEST_DEFAULT_BUFFER);
+  const minPrice = current * (1 + SUGGEST_MIN_GAP);
+  const targetPrice = roundTakeProfit(raw, minPrice);
+  if (!(targetPrice > current)) return null;
+
+  const gap = (targetPrice - current) / current;
+  const thisFriday = upcomingFriday(now);
+  const targetDateObj =
+    gap > SUGGEST_NEAR_GAP ? addCalendarDays(thisFriday, 7) : thisFriday;
+  const targetDate = calendarDateString(targetDateObj);
+  const dateLabel = formatFridayLabel(targetDateObj, now);
+  const priceLabel = `$${
+    Number.isInteger(targetPrice) ? targetPrice.toFixed(0) : targetPrice.toFixed(2)
+  }`;
+  const source = resistance != null ? "resistance" : "buffer";
+
+  return {
+    targetPrice,
+    targetDate,
+    dateLabel,
+    summary: `Sell by ${dateLabel} · target ${priceLabel}`,
+    reason:
+      source === "resistance"
+        ? "Nearest resistance above the live price."
+        : "About 3% above the live price — no nearby resistance shelf.",
+    source,
+  };
+}
+
+/** Price half of `suggestSellPlan` — nearest weekly-horizon resistance, or ~3% up. */
 export function suggestedTargetPrice(
   currentPrice: number,
   resistanceLevels: Array<{ price: number }>
 ): number | undefined {
-  if (!Number.isFinite(currentPrice) || currentPrice <= 0) return undefined;
+  return suggestSellPlan({ currentPrice, resistanceLevels })?.targetPrice;
+}
 
-  const above = resistanceLevels
-    .map((level) => level.price)
-    .filter((price) => Number.isFinite(price) && price > currentPrice * 1.01)
-    .sort((a, b) => a - b);
+export function compactSellTargetLine(
+  target: SellTarget,
+  now: Date = new Date()
+): string | null {
+  const targetPrice = sanitizeTargetPrice(target.targetPrice);
+  const targetDate = sanitizeTargetDate(target.targetDate);
+  if (targetPrice == null && targetDate == null) return null;
 
-  return above[0];
+  const parts: string[] = [];
+  if (targetDate) {
+    const due = parseCalendarDate(targetDate);
+    parts.push(`Sell by ${due ? formatFridayLabel(due, now) : formatCalendarDate(targetDate)}`);
+  }
+  if (targetPrice != null) {
+    const priceLabel = Number.isInteger(targetPrice)
+      ? targetPrice.toFixed(0)
+      : targetPrice.toFixed(2);
+    parts.push(`target $${priceLabel}`);
+  }
+  return parts.join(" · ");
 }
 
 export function compareReminderUrgency(

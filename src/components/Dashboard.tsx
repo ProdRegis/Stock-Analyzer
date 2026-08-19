@@ -243,7 +243,11 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <SellReminderList analysis={analysis} holdings={holdings} />
+                  <SellReminderList
+                    analysis={analysis}
+                    holdings={holdings}
+                    onTargetChange={handleTargetChange}
+                  />
                   <HoldingsTable
                     analysis={analysis}
                     holdings={holdings}

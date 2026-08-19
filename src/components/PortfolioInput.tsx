@@ -128,8 +128,9 @@ export default function PortfolioInput({
         </h2>
         <p className="text-sm text-slate-400">
           Add your tickers, share counts, and what you paid per share. After
-          analyzing, open a holding to set a sell price or sell-by date. Data is
-          fetched live from Yahoo Finance.
+          analyzing, each holding gets a suggested sell-by Friday and target
+          price. Use that plan or type your own. Data is fetched live from
+          Yahoo Finance.
         </p>
       </div>
 

@@ -4,7 +4,12 @@ import { Fragment, useState } from "react";
 import { ChevronRight, LineChart } from "lucide-react";
 import RiskBadge from "./RiskBadge";
 import StockCard from "./StockCard";
-import { evaluateSellReminder } from "@/lib/sell-reminder";
+import {
+  compactSellTargetLine,
+  evaluateSellReminder,
+  hasSellTarget,
+  suggestSellPlan,
+} from "@/lib/sell-reminder";
 import type { PortfolioAnalysis, PortfolioHolding } from "@/lib/types";
 
 function formatCurrency(value: number, currency = "USD") {
@@ -90,6 +95,20 @@ export default function HoldingsTable({
               });
               const sellNow =
                 reminder?.urgency === "hit" || reminder?.urgency === "due";
+              const userLine = compactSellTargetLine({
+                targetPrice: stored?.targetPrice,
+                targetDate: stored?.targetDate,
+              });
+              const plan = hasSellTarget({
+                targetPrice: stored?.targetPrice,
+                targetDate: stored?.targetDate,
+              })
+                ? null
+                : suggestSellPlan({
+                    currentPrice: analysisRow.currentPrice,
+                    resistanceLevels: analysisRow.resistanceLevels,
+                  });
+              const sellLine = userLine ?? plan?.summary;
 
               return (
                 <Fragment key={holding.symbol}>
@@ -132,6 +151,11 @@ export default function HoldingsTable({
                           <p className="truncate text-xs text-slate-500">
                             {analysisRow.name}
                           </p>
+                          {sellLine && (
+                            <p className="mt-0.5 truncate text-xs text-slate-400">
+                              {sellLine}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -200,7 +224,9 @@ export default function HoldingsTable({
         </table>
       </div>
       <p className="border-t border-slate-800 px-4 py-2.5 text-xs text-slate-500">
-        Open a row for the chart, sell reminder, and risk metrics.
+        Open a row for the chart, sell reminder, and risk metrics. Suggested
+        sell-by dates and target prices are a weekly take-profit, not a
+        stop-loss.
       </p>
     </section>
   );

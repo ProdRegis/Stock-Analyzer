@@ -4,7 +4,7 @@ import PriceChart from "./PriceChart";
 import SellReminderBanner from "./SellReminderBanner";
 import {
   evaluateSellReminder,
-  suggestedTargetPrice,
+  suggestSellPlan,
 } from "@/lib/sell-reminder";
 import type { PortfolioPositionPnl, StockAnalysis } from "@/lib/types";
 
@@ -47,10 +47,14 @@ export default function StockCard({
     currentPrice: analysis.currentPrice,
     target: { targetPrice, targetDate },
   });
-  const suggested = suggestedTargetPrice(
-    analysis.currentPrice,
-    analysis.resistanceLevels
-  );
+  const plan = suggestSellPlan({
+    currentPrice: analysis.currentPrice,
+    resistanceLevels: analysis.resistanceLevels,
+  });
+  const usingPlan =
+    plan != null &&
+    targetPrice === plan.targetPrice &&
+    targetDate === plan.targetDate;
   const inputClass =
     "w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none";
 
@@ -97,6 +101,12 @@ export default function StockCard({
           <p className="mt-1 text-xs text-slate-500">
             A take-profit you chose — not a stop-loss. Leave either field blank
             if you only care about the other.
+            {plan && (
+              <>
+                {" "}
+                Suggested: {plan.summary}. {plan.reason}
+              </>
+            )}
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="block text-xs text-slate-400">
@@ -142,19 +152,24 @@ export default function StockCard({
             </label>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {suggested != null && (
+            {plan && !usingPlan && (
               <button
                 type="button"
                 onClick={() =>
                   onTargetChange({
-                    targetPrice: suggested,
-                    targetDate,
+                    targetPrice: plan.targetPrice,
+                    targetDate: plan.targetDate,
                   })
                 }
                 className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800 hover:text-white"
               >
-                Use nearest resistance (${suggested.toFixed(2)})
+                Use suggested plan ({plan.summary})
               </button>
+            )}
+            {usingPlan && plan && (
+              <p className="self-center text-xs text-slate-500">
+                Using the suggested plan ({plan.summary}).
+              </p>
             )}
             {(targetPrice != null || targetDate) && (
               <button

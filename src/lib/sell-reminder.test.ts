@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   calendarDateString,
+  compactSellTargetLine,
   compareReminderUrgency,
   evaluateSellReminder,
+  formatFridayLabel,
   hasSellTarget,
   parseCalendarDate,
+  roundTakeProfit,
   sanitizeTargetDate,
   sanitizeTargetPrice,
+  suggestSellPlan,
   suggestedTargetPrice,
+  upcomingFriday,
 } from "./sell-reminder";
 
 const noon = (isoDate: string) => {
@@ -160,7 +165,7 @@ describe("evaluateSellReminder", () => {
 });
 
 describe("suggestedTargetPrice", () => {
-  it("picks the nearest resistance at least 1% above the live price", () => {
+  it("picks the nearest resistance at least 1% and at most 8% above the live price", () => {
     expect(
       suggestedTargetPrice(100, [
         { price: 100.5 },
@@ -171,10 +176,103 @@ describe("suggestedTargetPrice", () => {
     ).toBe(108);
   });
 
-  it("returns nothing when every shelf is already being tested", () => {
+  it("falls back to about 3% up when every shelf is already being tested", () => {
     expect(suggestedTargetPrice(100, [{ price: 100.4 }, { price: 99 }])).toBe(
-      undefined
+      103
     );
+  });
+});
+
+describe("upcomingFriday", () => {
+  it("returns this Friday from midweek", () => {
+    expect(calendarDateString(upcomingFriday(noon("2026-08-19")))).toBe(
+      "2026-08-21"
+    );
+  });
+
+  it("returns today when it is already Friday", () => {
+    expect(calendarDateString(upcomingFriday(noon("2026-08-21")))).toBe(
+      "2026-08-21"
+    );
+  });
+
+  it("skips to the next Friday on Saturday", () => {
+    expect(calendarDateString(upcomingFriday(noon("2026-08-22")))).toBe(
+      "2026-08-28"
+    );
+  });
+});
+
+describe("formatFridayLabel", () => {
+  it("says this Friday, next Friday, or today", () => {
+    const wednesday = noon("2026-08-19");
+    expect(formatFridayLabel(noon("2026-08-21"), wednesday)).toBe("this Friday");
+    expect(formatFridayLabel(noon("2026-08-28"), wednesday)).toBe("next Friday");
+    expect(formatFridayLabel(noon("2026-08-21"), noon("2026-08-21"))).toBe(
+      "today (Friday)"
+    );
+  });
+});
+
+describe("roundTakeProfit", () => {
+  it("rounds a ~317 weekly target to a whole dollar", () => {
+    expect(roundTakeProfit(317.03, 310)).toBe(317);
+  });
+
+  it("does not round below the live-price floor", () => {
+    expect(roundTakeProfit(101.2, 101.4)).toBe(102);
+  });
+});
+
+describe("suggestSellPlan", () => {
+  it("pairs a nearby resistance with this Friday when the gap is small", () => {
+    const plan = suggestSellPlan({
+      currentPrice: 100,
+      resistanceLevels: [{ price: 103 }],
+      now: noon("2026-08-19"),
+    });
+
+    expect(plan).not.toBeNull();
+    expect(plan!.targetPrice).toBe(103);
+    expect(plan!.targetDate).toBe("2026-08-21");
+    expect(plan!.dateLabel).toBe("this Friday");
+    expect(plan!.summary).toBe("Sell by this Friday · target $103");
+    expect(plan!.source).toBe("resistance");
+  });
+
+  it("uses next Friday when the target is farther than 4%", () => {
+    const plan = suggestSellPlan({
+      currentPrice: 100,
+      resistanceLevels: [{ price: 108 }],
+      now: noon("2026-08-19"),
+    });
+
+    expect(plan!.targetDate).toBe("2026-08-28");
+    expect(plan!.dateLabel).toBe("next Friday");
+    expect(plan!.summary).toBe("Sell by next Friday · target $108");
+  });
+
+  it("falls back to a 3% buffer when there is no nearby resistance", () => {
+    const plan = suggestSellPlan({
+      currentPrice: 307.8,
+      resistanceLevels: [{ price: 250 }, { price: 400 }],
+      now: noon("2026-08-19"),
+    });
+
+    expect(plan!.targetPrice).toBe(317);
+    expect(plan!.source).toBe("buffer");
+    expect(plan!.summary).toBe("Sell by this Friday · target $317");
+  });
+});
+
+describe("compactSellTargetLine", () => {
+  it("phrases a saved Friday target the same way as the suggestion", () => {
+    expect(
+      compactSellTargetLine(
+        { targetPrice: 317, targetDate: "2026-08-21" },
+        noon("2026-08-19")
+      )
+    ).toBe("Sell by this Friday · target $317");
   });
 });
 
