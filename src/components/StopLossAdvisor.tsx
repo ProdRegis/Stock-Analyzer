@@ -58,6 +58,18 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
   const [details, setDetails] = useState<
     Record<string, StopLossRecommendation | "loading">
   >({});
+  const [resultKey, setResultKey] = useState<string | null>(null);
+
+  const holdingsKey = validHoldings
+    .map(
+      (holding) =>
+        `${holding.symbol.trim().toUpperCase()}:${holding.shares}:${holding.avgCost ?? ""}`
+    )
+    .join("|");
+  const currentRows = resultKey === holdingsKey ? rows : [];
+  const currentFailures = resultKey === holdingsKey ? failures : [];
+  const currentUpdatedAt = resultKey === holdingsKey ? updatedAt : null;
+  const currentError = resultKey === holdingsKey ? error : null;
 
   const handleCalculate = useCallback(async () => {
     if (validHoldings.length === 0) return;
@@ -82,14 +94,16 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
       setRows(data.recommendations ?? []);
       setFailures(data.failures ?? []);
       setUpdatedAt(data.updatedAt ?? new Date().toISOString());
+      setResultKey(holdingsKey);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setRows([]);
       setFailures([]);
+      setResultKey(holdingsKey);
     } finally {
       setLoading(false);
     }
-  }, [direction, validHoldings]);
+  }, [direction, validHoldings, holdingsKey]);
 
   const toggleRow = useCallback(
     async (row: StopLossRecommendation) => {
@@ -127,11 +141,11 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
     [details, expanded]
   );
 
-  const totalAtRisk = rows.reduce(
+  const totalAtRisk = currentRows.reduce(
     (sum, row) => sum + (row.maxLossDollars ?? 0),
     0
   );
-  const totalValue = rows.reduce(
+  const totalValue = currentRows.reduce(
     (sum, row) => sum + (row.positionValue ?? 0),
     0
   );
@@ -194,19 +208,19 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
                   }`}
             </button>
 
-            {updatedAt && !loading && (
+            {currentUpdatedAt && !loading && (
               <p className="text-xs text-slate-500">
-                Updated {formatTimestamp(updatedAt)}
+                Updated {formatTimestamp(currentUpdatedAt)}
               </p>
             )}
           </div>
         )}
 
-        {error && (
+        {currentError && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             <span className="flex items-center gap-2">
               <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
-              {error}
+              {currentError}
             </span>
             <button
               type="button"
@@ -229,13 +243,13 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
         </section>
       )}
 
-      {rows.length > 0 && !loading && (
+      {currentRows.length > 0 && !loading && (
         <section className="surface-2 rounded-2xl p-5">
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
             <div className="surface-3 rounded-lg px-3 py-2">
               <p className="text-xs text-slate-500">Positions covered</p>
               <p className="font-semibold tabular-nums text-white">
-                {rows.length}
+                {currentRows.length}
               </p>
             </div>
             <div className="surface-3 rounded-lg px-3 py-2">
@@ -277,7 +291,7 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => {
+                {currentRows.map((row) => {
                   const isOpen = expanded === row.symbol;
                   const detail = details[row.symbol];
 
@@ -398,10 +412,10 @@ export default function StopLossAdvisor({ holdings }: StopLossAdvisorProps) {
             </table>
           </div>
 
-          {failures.length > 0 && (
+          {currentFailures.length > 0 && (
             <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               Couldn&apos;t compute stops for{" "}
-              {failures.map((failure) => failure.symbol).join(", ")}.
+              {currentFailures.map((failure) => failure.symbol).join(", ")}.
             </p>
           )}
 

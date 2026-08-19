@@ -43,21 +43,25 @@ export function PortfolioSkeleton() {
         ))}
       </div>
 
-      <div className="space-y-3">
-        {Array.from({ length: 3 }).map((_, index) => (
+      <div className="overflow-hidden rounded-2xl border border-slate-700/60">
+        <div className="grid grid-cols-6 gap-2 border-b border-slate-800 px-4 py-2">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <Skeleton key={index} className="h-3 w-12" />
+          ))}
+        </div>
+        {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}
-            className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4"
+            className="flex items-center justify-between border-b border-slate-800/80 px-4 py-3 last:border-0"
           >
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-24" />
-                <Skeleton className="h-3 w-40" />
-              </div>
-              <div className="space-y-2 text-right">
-                <Skeleton className="ml-auto h-6 w-24" />
-                <Skeleton className="ml-auto h-3 w-16" />
-              </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+            <div className="flex gap-8">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="hidden h-4 w-14 sm:block" />
+              <Skeleton className="h-5 w-24 rounded-full" />
             </div>
           </div>
         ))}

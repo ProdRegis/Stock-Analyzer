@@ -25,7 +25,7 @@ the risk metrics still work, but you lose unrealized P&L, the break-even line
 on charts, and the Safety Stops tab's read on whether a stop locks in a gain.
 
 Each holding can also carry a sell reminder: a take-profit price, a sell-by
-date, or both. Those live on the stock card under Individual Stock Analysis,
+date, or both. Those live on each holding under Portfolio Analysis,
 compared against the live price, and persist with the portfolio. A price hit
 or a due date surfaces at the top of that section so you do not have to open
 every card. This is not a stop-loss — stops still live on the Safety Stops tab.
@@ -204,7 +204,7 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-214 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+220 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation, R² and reliability of the SPY regression), technical indicators (RSI, ATR, moving averages, support and
 resistance), sell-reminder urgency (price hit, due date, approaching), cache
 behavior including coalescing and stale-on-error, rate limit enforcement, the

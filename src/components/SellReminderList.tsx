@@ -44,7 +44,7 @@ export default function SellReminderList({
   if (items.length === 0) {
     return (
       <p className="mb-4 text-sm text-slate-500">
-        Set a sell price or a sell-by date on a stock card to get a reminder
+        Set a sell price or a sell-by date on a holding to get a reminder
         when it is time to take profit. That is separate from a safety stop,
         which is the price that cuts a loss.
       </p>

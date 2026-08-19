@@ -10,6 +10,7 @@ import { getAffectedSymbols } from "@/lib/news-impact";
 
 interface RecentNewsProps {
   portfolioSymbols?: string[];
+  active?: boolean;
 }
 
 const impactStyles = {
@@ -275,7 +276,10 @@ function NewsCard({ article }: { article: NewsArticle }) {
   );
 }
 
-export default function RecentNews({ portfolioSymbols = [] }: RecentNewsProps) {
+export default function RecentNews({
+  portfolioSymbols = [],
+  active = true,
+}: RecentNewsProps) {
   const [feed, setFeed] = useState<NewsFeed | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -315,7 +319,10 @@ export default function RecentNews({ portfolioSymbols = [] }: RecentNewsProps) {
 
   // One timer drives the first fetch and the refresh cycle. Deferring the
   // initial call keeps the loading flag out of the commit that schedules it.
+  // The tab stays mounted after the first visit, so skip the timers while hidden.
   useEffect(() => {
+    if (!active) return;
+
     const initial = window.setTimeout(loadNews, 0);
     const interval = window.setInterval(loadNews, 5 * 60_000);
 
@@ -323,7 +330,7 @@ export default function RecentNews({ portfolioSymbols = [] }: RecentNewsProps) {
       window.clearTimeout(initial);
       window.clearInterval(interval);
     };
-  }, [loadNews]);
+  }, [loadNews, active]);
 
   const filteredArticles = useMemo(() => {
     if (!feed) return [];

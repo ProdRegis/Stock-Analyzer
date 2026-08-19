@@ -233,7 +233,11 @@ function CandidateCard({ candidate }: { candidate: BreakoutCandidate }) {
   );
 }
 
-export default function BreakoutScanner() {
+export default function BreakoutScanner({
+  active = true,
+}: {
+  active?: boolean;
+}) {
   const [candidates, setCandidates] = useState<BreakoutCandidate[]>([]);
   const candidatesRef = useRef<BreakoutCandidate[]>([]);
   const liveRefreshInFlight = useRef(false);
@@ -368,14 +372,14 @@ export default function BreakoutScanner() {
   }, [scanning]);
 
   useEffect(() => {
-    if (!liveUpdates || candidates.length === 0) return;
+    if (!active || !liveUpdates || candidates.length === 0) return;
 
     const interval = setInterval(() => {
       refreshLive();
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [liveUpdates, candidates.length, refreshLive]);
+  }, [active, liveUpdates, candidates.length, refreshLive]);
 
   return (
     <div className="space-y-6">

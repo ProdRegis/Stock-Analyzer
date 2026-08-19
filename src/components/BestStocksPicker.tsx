@@ -111,13 +111,14 @@ function SellReasonList({
   );
 }
 
-function LiveClock() {
+function LiveClock({ active = true }: { active?: boolean }) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
+    if (!active) return;
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [active]);
 
   return (
     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
@@ -417,7 +418,11 @@ function DipCandidateCard({ candidate }: { candidate: DipCandidate }) {
   );
 }
 
-export default function BestStocksPicker() {
+export default function BestStocksPicker({
+  active = true,
+}: {
+  active?: boolean;
+}) {
   const [candidates, setCandidates] = useState<DipCandidate[]>([]);
   const candidatesRef = useRef<DipCandidate[]>([]);
   const liveRefreshInFlight = useRef(false);
@@ -567,14 +572,14 @@ export default function BestStocksPicker() {
   }, [scanning]);
 
   useEffect(() => {
-    if (!liveUpdates || candidates.length === 0) return;
+    if (!active || !liveUpdates || candidates.length === 0) return;
 
     const interval = setInterval(() => {
       refreshLive();
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [liveUpdates, candidates.length, refreshLive]);
+  }, [active, liveUpdates, candidates.length, refreshLive]);
 
   const filteredCandidates = useMemo(() => {
     return candidates.filter((candidate) => {
@@ -590,7 +595,7 @@ export default function BestStocksPicker() {
 
   return (
     <div className="space-y-6">
-      <LiveClock />
+      <LiveClock active={active} />
 
       <section className="surface-2 rounded-2xl p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
