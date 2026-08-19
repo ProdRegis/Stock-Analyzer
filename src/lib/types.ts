@@ -332,6 +332,10 @@ export interface PortfolioHolding {
   shares: number;
   /** Average price paid per share. Undefined when the user hasn't entered one. */
   avgCost?: number;
+  /** Take-profit price the owner wants to be reminded to sell at. */
+  targetPrice?: number;
+  /** Calendar date (YYYY-MM-DD) the owner wants to be reminded to sell by. */
+  targetDate?: string;
 }
 
 export interface PortfolioPositionPnl {

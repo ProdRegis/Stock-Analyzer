@@ -14,6 +14,7 @@ import RecentNews from "./RecentNews";
 import SavedPortfolios from "./SavedPortfolios";
 import StockCard from "./StockCard";
 import StopLossAdvisor from "./StopLossAdvisor";
+import SellReminderList from "./SellReminderList";
 import TabNav, { type DashboardTab } from "./TabNav";
 import { PortfolioSkeleton } from "./Skeleton";
 import { usePersistentStore } from "@/hooks/usePersistentStore";
@@ -86,6 +87,23 @@ export default function Dashboard() {
     const timer = window.setTimeout(() => handleAnalyze(DEMO_PORTFOLIO), 0);
     return () => window.clearTimeout(timer);
   }, [storedHoldings, handleAnalyze]);
+
+  function handleTargetChange(
+    symbol: string,
+    target: { targetPrice?: number; targetDate?: string }
+  ) {
+    setHoldings(
+      holdings.map((holding) =>
+        holding.symbol.trim().toUpperCase() === symbol.toUpperCase()
+          ? {
+              ...holding,
+              targetPrice: target.targetPrice,
+              targetDate: target.targetDate,
+            }
+          : holding
+      )
+    );
+  }
 
   function handleLoadPortfolio(loadedHoldings: PortfolioHolding[]) {
     setHoldings(loadedHoldings);
@@ -166,17 +184,30 @@ export default function Dashboard() {
                   <LineChart className="h-5 w-5 text-slate-500" aria-hidden="true" />
                   Individual Stock Analysis
                 </h2>
+                <SellReminderList analysis={analysis} holdings={holdings} />
                 <div className="space-y-3">
-                  {analysis.holdings.map((holding) => (
-                    <StockCard
-                      key={holding.symbol}
-                      analysis={holding.analysis}
-                      weight={holding.weight}
-                      value={holding.value}
-                      shares={holding.shares}
-                      pnl={holding.pnl}
-                    />
-                  ))}
+                  {analysis.holdings.map((holding) => {
+                    const stored = holdings.find(
+                      (row) =>
+                        row.symbol.trim().toUpperCase() === holding.symbol
+                    );
+
+                    return (
+                      <StockCard
+                        key={holding.symbol}
+                        analysis={holding.analysis}
+                        weight={holding.weight}
+                        value={holding.value}
+                        shares={holding.shares}
+                        pnl={holding.pnl}
+                        targetPrice={stored?.targetPrice}
+                        targetDate={stored?.targetDate}
+                        onTargetChange={(target) =>
+                          handleTargetChange(holding.symbol, target)
+                        }
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </>

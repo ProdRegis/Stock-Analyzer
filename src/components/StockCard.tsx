@@ -3,6 +3,11 @@
 import { useState } from "react";
 import PriceChart from "./PriceChart";
 import RiskBadge from "./RiskBadge";
+import SellReminderBanner from "./SellReminderBanner";
+import {
+  evaluateSellReminder,
+  suggestedTargetPrice,
+} from "@/lib/sell-reminder";
 import type { PortfolioPositionPnl, StockAnalysis } from "@/lib/types";
 
 interface StockCardProps {
@@ -11,6 +16,12 @@ interface StockCardProps {
   value?: number;
   shares?: number;
   pnl?: PortfolioPositionPnl | null;
+  targetPrice?: number;
+  targetDate?: string;
+  onTargetChange?: (target: {
+    targetPrice?: number;
+    targetDate?: string;
+  }) => void;
 }
 
 function formatPercent(value: number) {
@@ -31,12 +42,25 @@ export default function StockCard({
   value,
   shares,
   pnl,
+  targetPrice,
+  targetDate,
+  onTargetChange,
 }: StockCardProps) {
   const [expanded, setExpanded] = useState(false);
   const { movingAverages: ma, breakout } = analysis;
 
   const up = analysis.changePercent >= 0;
   const pnlPositive = (pnl?.unrealizedGain ?? 0) >= 0;
+  const reminder = evaluateSellReminder({
+    currentPrice: analysis.currentPrice,
+    target: { targetPrice, targetDate },
+  });
+  const suggested = suggestedTargetPrice(
+    analysis.currentPrice,
+    analysis.resistanceLevels
+  );
+  const inputClass =
+    "w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none";
 
   return (
     <article className="surface-2 rounded-2xl backdrop-blur transition hover:border-slate-500/50">
@@ -56,6 +80,12 @@ export default function StockCard({
               score={analysis.risk.riskScore}
               size="sm"
             />
+            {reminder &&
+              (reminder.urgency === "hit" || reminder.urgency === "due") && (
+                <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-200">
+                  Sell now
+                </span>
+              )}
           </div>
           <p className="text-sm text-slate-400">{analysis.name}</p>
 
@@ -102,13 +132,19 @@ export default function StockCard({
         </div>
       </div>
 
+      {reminder && (
+        <div className="px-4 pb-3">
+          <SellReminderBanner reminder={reminder} />
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => setExpanded((current) => !current)}
         aria-expanded={expanded}
         className="w-full border-t border-slate-700/60 px-4 py-2.5 text-left text-sm font-medium text-blue-400 transition hover:bg-slate-800/40 hover:text-blue-300"
       >
-        {expanded ? "Hide details" : "Show chart, levels & risk metrics"}
+        {expanded ? "Hide details" : "Show chart, sell target & risk metrics"}
       </button>
 
       {expanded && (
@@ -138,6 +174,92 @@ export default function StockCard({
                     ? formatCurrency(value, analysis.currency)
                     : "—"}
                 </p>
+              </div>
+            </div>
+          )}
+
+          {onTargetChange && (
+            <div className="mb-4 rounded-xl border border-slate-700/60 bg-slate-900/40 p-3">
+              <h4 className="text-sm font-medium text-slate-300">
+                Sell reminder
+              </h4>
+              <p className="mt-1 text-xs text-slate-500">
+                A take-profit you chose — not a stop-loss. Leave either field
+                blank if you only care about the other.
+              </p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs text-slate-400">
+                  Target price
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="e.g. 210.00"
+                    aria-label={`${analysis.symbol} sell target price`}
+                    value={targetPrice ?? ""}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      const parsed = Number(value);
+                      onTargetChange({
+                        targetPrice:
+                          value.trim() === "" ||
+                          !Number.isFinite(parsed) ||
+                          parsed <= 0
+                            ? undefined
+                            : parsed,
+                        targetDate,
+                      });
+                    }}
+                    className={`mt-1 tabular-nums ${inputClass}`}
+                  />
+                </label>
+                <label className="block text-xs text-slate-400">
+                  Sell-by date
+                  <input
+                    type="date"
+                    aria-label={`${analysis.symbol} sell-by date`}
+                    value={targetDate ?? ""}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      onTargetChange({
+                        targetPrice,
+                        targetDate: value.trim() === "" ? undefined : value,
+                      });
+                    }}
+                    className={`mt-1 ${inputClass}`}
+                  />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {suggested != null && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onTargetChange({
+                        targetPrice: suggested,
+                        targetDate,
+                      })
+                    }
+                    className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-800 hover:text-white"
+                  >
+                    Use nearest resistance ($
+                    {suggested.toFixed(2)})
+                  </button>
+                )}
+                {(targetPrice != null || targetDate) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onTargetChange({
+                        targetPrice: undefined,
+                        targetDate: undefined,
+                      })
+                    }
+                    className="rounded-lg px-3 py-1.5 text-xs text-slate-500 transition hover:bg-slate-800 hover:text-red-300"
+                  >
+                    Clear reminder
+                  </button>
+                )}
               </div>
             </div>
           )}

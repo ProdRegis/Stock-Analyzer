@@ -22,6 +22,12 @@ Average cost is the price paid per share. It is optional: leave it blank and
 the risk metrics still work, but you lose unrealized P&L, the break-even line
 on charts, and the Safety Stops tab's read on whether a stop locks in a gain.
 
+Each holding can also carry a sell reminder: a take-profit price, a sell-by
+date, or both. Those live on the stock card under Individual Stock Analysis,
+compared against the live price, and persist with the portfolio. A price hit
+or a due date surfaces at the top of that section so you do not have to open
+every card. This is not a stop-loss — stops still live on the Safety Stops tab.
+
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
 resistance and how past breakouts resolved. Search accepts either a ticker or a
 company name.
@@ -192,12 +198,13 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-181 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+196 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation), technical indicators (RSI, ATR, moving averages, support and
-resistance), cache behavior including coalescing and stale-on-error, rate limit
-enforcement, the password gate, profile isolation and migration, market hours
-across weekends and both daylight and standard time, and both import parsers
-including the comma-versus-digit-grouping ambiguity in pasted tables.
+resistance), sell-reminder urgency (price hit, due date, approaching), cache
+behavior including coalescing and stale-on-error, rate limit enforcement, the
+password gate, profile isolation and migration, market hours across weekends
+and both daylight and standard time, and both import parsers including the
+comma-versus-digit-grouping ambiguity in pasted tables.
 
 ## Theming
 

@@ -108,6 +108,8 @@ export default function PortfolioInput({
         symbol: committedSymbols[index] ?? row.symbol.trim().toUpperCase(),
         shares: row.shares,
         avgCost: row.avgCost,
+        targetPrice: row.targetPrice,
+        targetDate: row.targetDate,
       }))
       .filter((row) => row.symbol.length > 0 && row.shares > 0);
 
@@ -125,8 +127,9 @@ export default function PortfolioInput({
           Your Portfolio
         </h2>
         <p className="text-sm text-slate-400">
-          Add your tickers, share counts, and what you paid per share. Data is
-          fetched live from Yahoo Finance.
+          Add your tickers, share counts, and what you paid per share. After
+          analyzing, set a sell price or sell-by date on each stock card to get
+          a reminder. Data is fetched live from Yahoo Finance.
         </p>
       </div>
 

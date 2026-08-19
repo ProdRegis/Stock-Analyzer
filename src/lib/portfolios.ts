@@ -9,6 +9,7 @@ import {
   profileScopedKey,
   registerProfileScopedStore,
 } from "./profiles";
+import { sanitizeTargetDate, sanitizeTargetPrice } from "./sell-reminder";
 
 /**
  * Resolves the storage key for the active profile, or null when nobody is
@@ -100,6 +101,8 @@ export function loadWorkingPortfolio(): PortfolioHolding[] | null {
         typeof holding.avgCost === "number" && holding.avgCost > 0
           ? holding.avgCost
           : undefined,
+      targetPrice: sanitizeTargetPrice(holding.targetPrice),
+      targetDate: sanitizeTargetDate(holding.targetDate),
     }));
 
     return holdings.length > 0 ? holdings : null;
