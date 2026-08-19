@@ -3,7 +3,9 @@ import {
   alignedMultiSeriesReturns,
   alignedPairReturns,
   annualizedVolatility,
+  assessReliability,
   averageCorrelation,
+  averagePairRSquared,
   beta,
   correlation,
   correlationMatrix,
@@ -12,6 +14,7 @@ import {
   herfindahlIndex,
   logDailyReturns,
   maxDrawdown,
+  olsFit,
   portfolioVolatilityAligned,
   riskLevel,
   sharpeRatio,
@@ -149,6 +152,88 @@ describe("correlation", () => {
   it("averages only the off-diagonal pairs", () => {
     const a = [0.01, -0.02, 0.03];
     expect(averageCorrelation([a, a])).toBeCloseTo(1, 10);
+  });
+});
+
+describe("olsFit", () => {
+  it("reports R² equal to r squared, and a beta that matches beta()", () => {
+    const market = [0.01, -0.02, 0.015, 0.004, -0.008, 0.012, 0.003];
+    const stock = market.map((value) => value * 1.4);
+    const fit = olsFit(stock, market);
+
+    expect(fit).not.toBeNull();
+    expect(fit!.beta).toBeCloseTo(beta(stock, market), 10);
+    expect(fit!.r).toBeCloseTo(1, 8);
+    expect(fit!.rSquared).toBeCloseTo(fit!.r ** 2, 12);
+    expect(fit!.rSquared).toBeCloseTo(1, 8);
+    expect(fit!.n).toBe(market.length);
+    expect(fit!.pValue).toBeLessThan(0.001);
+  });
+
+  it("is unidentified when the market never moves", () => {
+    expect(olsFit([0.01, 0.02, 0.03], [0, 0, 0])).toBeNull();
+  });
+
+  it("is unidentified with fewer than 3 observations", () => {
+    expect(olsFit([0.01, 0.02], [0.01, 0.02])).toBeNull();
+  });
+
+  it("puts the true slope inside the 95% interval for a noisy multiple", () => {
+    const market: number[] = [];
+    const stock: number[] = [];
+    for (let i = 0; i < 400; i++) {
+      const x = Math.sin(i / 7) * 0.01;
+      market.push(x);
+      stock.push(1.5 * x + ((i % 5) - 2) * 0.0004);
+    }
+
+    const fit = olsFit(stock, market);
+    expect(fit).not.toBeNull();
+    expect(fit!.betaCiLow).toBeLessThan(1.5);
+    expect(fit!.betaCiHigh).toBeGreaterThan(1.5);
+    expect(fit!.rSquared).toBeGreaterThan(0.9);
+  });
+});
+
+describe("assessReliability", () => {
+  it("labels short history as Thin even when the fit is perfect", () => {
+    const x = [0.01, -0.02, 0.015, 0.004, -0.008];
+    const y = x.map((value) => value * 2);
+    expect(assessReliability(olsFit(y, x)).level).toBe("Thin");
+  });
+
+  it("labels a year of tight tracking as Strong", () => {
+    const x: number[] = [];
+    const y: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      const value = Math.sin(i / 9) * 0.012;
+      x.push(value);
+      y.push(value * 1.1);
+    }
+
+    const result = assessReliability(olsFit(y, x));
+    expect(result.level).toBe("Strong");
+    expect(result.score).toBeGreaterThanOrEqual(70);
+  });
+
+  it("labels an uncorrelated series as Weak", () => {
+    const x: number[] = [];
+    const y: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      x.push(Math.sin(i / 9) * 0.01);
+      y.push(Math.cos(i / 5) * 0.01);
+    }
+
+    const result = assessReliability(olsFit(y, x));
+    expect(result.level).toBe("Weak");
+  });
+
+  it("averages r² across pairs rather than squaring the average r", () => {
+    const a = [0.02, -0.01, 0.03, 0.00, 0.01];
+    const b = a.map((value) => value);
+    const c = a.map((value) => -value);
+    // Pairs: (a,b) r=1 → r²=1, (a,c) r=-1 → r²=1, (b,c) r=-1 → r²=1
+    expect(averagePairRSquared([a, b, c])).toBeCloseTo(1, 8);
   });
 });
 

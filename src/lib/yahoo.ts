@@ -3,6 +3,7 @@ import {
   annualizedVolatility,
   beta,
   maxDrawdown,
+  olsFit,
   riskLevel,
   riskScore,
   sharpeRatio,
@@ -81,6 +82,7 @@ export async function analyzeStock(
   const calculatedBeta = beta(stockReturns, marketReturns);
   const drawdown = maxDrawdown(closes);
   const sharpe = sharpeRatio(stockReturns, rateInfo.rate);
+  const fit = olsFit(stockReturns, marketReturns);
 
   const betaReconciled = reconcileBeta(
     calculatedBeta,
@@ -123,6 +125,16 @@ export async function analyzeStock(
         volatility: "Log-return std dev × √252 (aligned)",
         sharpe: `Excess log returns, rf=${(rateInfo.rate * 100).toFixed(2)}%, ×√252`,
       },
+      regression: fit
+        ? {
+            n: fit.n,
+            r: fit.r,
+            rSquared: fit.rSquared,
+            betaStdError: fit.betaStdError,
+            betaCiLow: fit.betaCiLow,
+            betaCiHigh: fit.betaCiHigh,
+          }
+        : undefined,
     },
   };
 }

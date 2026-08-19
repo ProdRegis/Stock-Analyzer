@@ -66,6 +66,14 @@ export default function PortfolioSummary({ analysis }: PortfolioSummaryProps) {
           ? "text-amber-300"
           : "text-slate-100",
     },
+    {
+      label: "R² vs SPY",
+      value: portfolioRisk.regression
+        ? portfolioRisk.regression.rSquared.toFixed(2)
+        : "—",
+      hint: "How much daily moves line up with SPY",
+      accent: "text-slate-100",
+    },
   ];
 
   return (
@@ -112,7 +120,7 @@ export default function PortfolioSummary({ analysis }: PortfolioSummaryProps) {
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         {metrics.map((metric) => (
           <div key={metric.label} className="surface-3 rounded-xl px-3 py-2.5">
             <p className="text-xs text-slate-400">{metric.label}</p>
@@ -135,8 +143,10 @@ export default function PortfolioSummary({ analysis }: PortfolioSummaryProps) {
       <p className="mt-4 text-xs leading-relaxed text-slate-500">
         Risk metrics use Yahoo adjusted closes (2y), SPY-aligned log returns, live
         Treasury yield for Sharpe, and blended beta when Yahoo statistics agree.
-        Portfolio volatility uses date-synchronized holdings. Informational only —
-        not financial advice.
+        Portfolio volatility uses date-synchronized holdings. R² is the share of
+        daily moves that line up with SPY — high means beta is a useful
+        description, low means these names do not track the market. Informational
+        only — not financial advice.
       </p>
     </section>
   );

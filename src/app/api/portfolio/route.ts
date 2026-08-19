@@ -3,9 +3,11 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 import {
   alignedMultiSeriesReturns,
   averageCorrelation,
+  averagePairRSquared,
   correlationMatrix,
   diversificationScore,
   herfindahlIndex,
+  olsFit,
   portfolioVolatilityAligned,
   riskLevel,
   riskScore,
@@ -76,7 +78,9 @@ export async function POST(request: Request) {
 
     const weights = values.map((value) => value / totalValue);
     const histories = analyses.map((analysis) => analysis.history);
-    const alignedReturns = alignedMultiSeriesReturns(histories);
+    const alignedWithSpy = alignedMultiSeriesReturns([...histories, spyHistory]);
+    const alignedReturns = alignedWithSpy.slice(0, histories.length);
+    const spyAligned = alignedWithSpy[histories.length] ?? [];
 
     const portfolioBeta = weights.reduce(
       (sum, weight, index) => sum + weight * analyses[index].risk.beta,
@@ -85,8 +89,22 @@ export async function POST(request: Request) {
 
     const portfolioVol = portfolioVolatilityAligned(weights, alignedReturns);
     const avgCorr = averageCorrelation(alignedReturns);
+    const pairRSquared = averagePairRSquared(alignedReturns);
+    const alignedDays = alignedReturns[0]?.length ?? 0;
     const concentration = herfindahlIndex(weights);
     const diversification = diversificationScore(weights);
+
+    const portfolioReturns: number[] = [];
+    const periods = alignedReturns[0]?.length ?? 0;
+    for (let t = 0; t < periods; t++) {
+      portfolioReturns.push(
+        weights.reduce(
+          (sum, weight, index) => sum + weight * (alignedReturns[index][t] ?? 0),
+          0
+        )
+      );
+    }
+    const portfolioFit = olsFit(portfolioReturns, spyAligned);
 
     const weightedDrawdown = weights.reduce(
       (sum, weight, index) =>
@@ -156,6 +174,18 @@ export async function POST(request: Request) {
         diversificationScore: diversification,
         concentrationRisk: Math.round(concentration * 100),
         avgCorrelation: avgCorr,
+        avgPairRSquared: pairRSquared,
+        alignedDays,
+        regression: portfolioFit
+          ? {
+              n: portfolioFit.n,
+              r: portfolioFit.r,
+              rSquared: portfolioFit.rSquared,
+              betaStdError: portfolioFit.betaStdError,
+              betaCiLow: portfolioFit.betaCiLow,
+              betaCiHigh: portfolioFit.betaCiHigh,
+            }
+          : undefined,
         correlationSymbols: body.holdings.map((holding) =>
           holding.symbol.toUpperCase()
         ),

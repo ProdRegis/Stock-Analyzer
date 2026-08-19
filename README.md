@@ -15,7 +15,9 @@ The dashboard is organized into five tabs.
 average cost. Returns a weighted risk score built from volatility, beta,
 drawdown, diversification, and concentration, plus unrealized P&L when cost
 basis is provided. Includes an allocation breakdown and a correlation heatmap
-showing how much your holdings actually move together. Positions can be typed
+showing how much your holdings actually move together. Beta is shown with R²
+versus SPY and a 95% interval so a slope that does not actually describe the
+stock is visible as a low R², not a fake-precise 1.30. Positions can be typed
 in or pasted in bulk — see [Importing holdings](#importing-holdings).
 
 Average cost is the price paid per share. It is optional: leave it blank and
@@ -150,16 +152,20 @@ The scanner and batch endpoints fan out to many symbols, so they set
 | Metric | Description |
 |--------|-------------|
 | **Volatility** | Standard deviation of daily log returns, annualized (× √252) |
-| **Beta** | Sensitivity to SPY, computed on date-aligned returns |
+| **Beta** | Sensitivity to SPY on date-aligned returns, with R² and a 95% interval |
 | **Sharpe Ratio** | Excess return over volatility, using a live Treasury risk-free rate |
 | **Max Drawdown** | Largest peak-to-trough decline in the last year |
 | **Risk Score** | Composite 0–100 score from volatility, beta, and drawdown |
+| **R² vs SPY** | Share of daily moves that line up with the market; r² from the same fit as beta |
 | **RSI** | Wilder's smoothing; returns neutral 50 on a flat series |
 | **Resistance** | Clustered local price highs from recent history |
 | **Breakout** | Price crossing resistance/support with volume confirmation |
 
 Returns are logarithmic, beta is computed only over dates present in both the
-stock and benchmark series, and annualization uses 252 trading days.
+stock and benchmark series, and annualization uses 252 trading days. R² is the
+square of the Pearson correlation with SPY from that same regression — the
+share of daily moves the market actually explains. A high R² means beta is a
+useful description; a low R² means the name does not track the market.
 
 ## Architecture Notes
 
@@ -198,8 +204,8 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-196 tests covering the financial math (volatility, beta, Sharpe, drawdown,
-correlation), technical indicators (RSI, ATR, moving averages, support and
+214 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+correlation, R² and reliability of the SPY regression), technical indicators (RSI, ATR, moving averages, support and
 resistance), sell-reminder urgency (price hit, due date, approaching), cache
 behavior including coalescing and stale-on-error, rate limit enforcement, the
 password gate, profile isolation and migration, market hours across weekends

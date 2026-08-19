@@ -314,8 +314,26 @@ export default function StockCard({
                   <span className="text-slate-400">Beta (vs SPY)</span>
                   <span className="tabular-nums text-white">
                     {analysis.risk.beta.toFixed(2)}
+                    {analysis.risk.regression && (
+                      <span className="ml-1 text-xs font-normal text-slate-500">
+                        [{analysis.risk.regression.betaCiLow.toFixed(2)},{" "}
+                        {analysis.risk.regression.betaCiHigh.toFixed(2)}]
+                      </span>
+                    )}
                   </span>
                 </div>
+                {analysis.risk.regression && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">R² vs SPY</span>
+                    <span className="text-right tabular-nums text-white">
+                      {analysis.risk.regression.rSquared.toFixed(2)}
+                      <span className="ml-1 text-xs font-normal text-slate-500">
+                        r {analysis.risk.regression.r.toFixed(2)} ·{" "}
+                        {analysis.risk.regression.n} days
+                      </span>
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-400">Max Drawdown</span>
                   <span className="tabular-nums text-white">
@@ -335,6 +353,14 @@ export default function StockCard({
                   </span>
                 </div>
               </div>
+              {analysis.risk.regression && (
+                <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                  R² is the share of this stock&apos;s daily moves that line up
+                  with SPY. High R² means beta is a useful description; low R²
+                  means this name does not track the market. The range next to
+                  beta is a 95% interval from that same fit.
+                </p>
+              )}
               {analysis.risk.metricSources && (
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">
                   Sources: {analysis.risk.metricSources.prices}; beta via{" "}

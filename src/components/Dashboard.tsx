@@ -176,6 +176,7 @@ export default function Dashboard() {
                   symbols={analysis.portfolioRisk.correlationSymbols}
                   matrix={analysis.portfolioRisk.correlationMatrix}
                   avgCorrelation={analysis.portfolioRisk.avgCorrelation}
+                  avgPairRSquared={analysis.portfolioRisk.avgPairRSquared}
                 />
               </div>
 

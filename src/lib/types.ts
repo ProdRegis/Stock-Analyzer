@@ -303,6 +303,16 @@ export interface MetricSources {
   sharpe: string;
 }
 
+/** OLS of this series on SPY: r, R² = r², and a 95% interval for beta. */
+export interface RegressionStats {
+  n: number;
+  r: number;
+  rSquared: number;
+  betaStdError: number;
+  betaCiLow: number;
+  betaCiHigh: number;
+}
+
 export interface StockRiskMetrics {
   annualizedVolatility: number;
   beta: number;
@@ -311,6 +321,7 @@ export interface StockRiskMetrics {
   riskScore: number;
   riskLevel: "Low" | "Moderate" | "High" | "Very High";
   metricSources?: MetricSources;
+  regression?: RegressionStats;
 }
 
 export interface StockAnalysis {
@@ -368,6 +379,9 @@ export interface PortfolioAnalysis {
     diversificationScore: number;
     concentrationRisk: number;
     avgCorrelation: number;
+    avgPairRSquared: number;
+    alignedDays: number;
+    regression?: RegressionStats;
     correlationSymbols: string[];
     correlationMatrix: number[][];
   };
