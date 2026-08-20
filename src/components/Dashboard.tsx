@@ -264,6 +264,7 @@ export default function Dashboard() {
                     analysis={analysis}
                     holdings={holdings}
                     onTargetChange={handleTargetChange}
+                    onOpenThesis={openThesis}
                   />
                 </div>
               </div>
@@ -301,13 +302,17 @@ export default function Dashboard() {
 
       {visited("stop-loss") && (
         <TabPanel active={activeTab === "stop-loss"}>
-          <StopLossAdvisor holdings={holdings} />
+          <StopLossAdvisor holdings={holdings} onOpenThesis={openThesis} />
         </TabPanel>
       )}
 
       {visited("copy-trading") && (
         <TabPanel active={activeTab === "copy-trading"}>
-          <CopyTrading active={activeTab === "copy-trading"} />
+          <CopyTrading
+            active={activeTab === "copy-trading"}
+            portfolioSymbols={portfolioSymbols}
+            onOpenThesis={openThesis}
+          />
         </TabPanel>
       )}
 
@@ -316,6 +321,7 @@ export default function Dashboard() {
           <RecentNews
             portfolioSymbols={portfolioSymbols}
             active={activeTab === "news"}
+            onOpenThesis={openThesis}
           />
         </TabPanel>
       )}

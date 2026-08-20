@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { matchNotableInvestors, padCik } from "./thirteen-f-filers";
 import {
   presentThirteenFBook,
+  filterThirteenFBook,
+  holdingMatchesQuery,
   diffThirteenFHoldings,
   holdingKey,
   parseThirteenFHoldings,
@@ -155,6 +157,7 @@ describe("presentThirteenFBook", () => {
       shareType: "SH",
       putCall: null,
       weight: 0,
+      ticker: null,
     }));
     const trades = holdings.map((row) => ({
       action: "opened" as const,
@@ -167,6 +170,7 @@ describe("presentThirteenFBook", () => {
       valueUsdAfter: row.valueUsd,
       shareChange: 1,
       valueChangeUsd: row.valueUsd,
+      ticker: null,
     }));
 
     const presented = presentThirteenFBook(holdings, trades);
@@ -176,5 +180,31 @@ describe("presentThirteenFBook", () => {
     expect(presented.holdings).toHaveLength(50);
     expect(presented.trades).toHaveLength(50);
     expect(presented.holdings[0].issuer).toBe("Name 0");
+  });
+});
+
+describe("holdingMatchesQuery", () => {
+  it("matches issuer, cusip, or ticker needles", () => {
+    const row = {
+      issuer: "APPLE INC",
+      cusip: "037833100",
+      ticker: "AAPL",
+    };
+    expect(holdingMatchesQuery(row, ["apple"])).toBe(true);
+    expect(holdingMatchesQuery(row, ["aapl"])).toBe(true);
+    expect(holdingMatchesQuery(row, ["037833"])).toBe(true);
+    expect(holdingMatchesQuery(row, ["microsoft"])).toBe(false);
+  });
+});
+
+describe("filterThirteenFBook", () => {
+  it("filters holdings and trades by issuer substring", () => {
+    const holdings = parseThirteenFHoldings(SAMPLE);
+    const trades = diffThirteenFHoldings(holdings, []);
+    const filtered = filterThirteenFBook(holdings, trades, ["amazon"]);
+    expect(filtered.holdings.every((row) => /amazon/i.test(row.issuer))).toBe(
+      true
+    );
+    expect(filtered.holdings.length).toBeGreaterThan(0);
   });
 });

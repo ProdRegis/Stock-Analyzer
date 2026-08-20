@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Newspaper } from "lucide-react";
 import EmptyState from "./EmptyState";
+import OpenThesisButton from "./OpenThesisButton";
 import PriceChart from "./PriceChart";
 import { useStockAnalysis } from "@/hooks/useStockAnalysis";
 import type { NewsArticle, NewsFeed, StockImpactAnalysis, UpcomingMarketEvent } from "@/lib/types";
@@ -11,6 +12,7 @@ import { getAffectedSymbols } from "@/lib/news-impact";
 interface RecentNewsProps {
   portfolioSymbols?: string[];
   active?: boolean;
+  onOpenThesis?: (symbol: string) => void;
 }
 
 const impactStyles = {
@@ -53,13 +55,22 @@ function eventLabel(event: UpcomingMarketEvent) {
   return "Ex-Dividend Date";
 }
 
-function EventCard({ event }: { event: UpcomingMarketEvent }) {
+function EventCard({
+  event,
+  onOpenThesis,
+}: {
+  event: UpcomingMarketEvent;
+  onOpenThesis?: (symbol: string) => void;
+}) {
   return (
     <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-semibold text-white">{event.symbol}</span>
+            {onOpenThesis && (
+              <OpenThesisButton symbol={event.symbol} onOpen={onOpenThesis} />
+            )}
             <span className="rounded-md bg-violet-500/5 px-2 py-0.5 text-xs text-violet-300">
               {eventLabel(event)}
             </span>
@@ -90,7 +101,13 @@ function formatSharpe(value: number) {
   return value.toFixed(2);
 }
 
-function StockImpactCard({ impact }: { impact: StockImpactAnalysis }) {
+function StockImpactCard({
+  impact,
+  onOpenThesis,
+}: {
+  impact: StockImpactAnalysis;
+  onOpenThesis?: (symbol: string) => void;
+}) {
   const { analysis, loading, error } = useStockAnalysis(impact.symbol);
   const [showChart, setShowChart] = useState(false);
 
@@ -104,6 +121,9 @@ function StockImpactCard({ impact }: { impact: StockImpactAnalysis }) {
     <div className="rounded-xl border border-slate-700/60 bg-slate-800/60 p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-semibold text-white">{impact.symbol}</span>
+        {onOpenThesis && (
+          <OpenThesisButton symbol={impact.symbol} onOpen={onOpenThesis} />
+        )}
         <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
           {relationshipLabels[impact.relationship]}
         </span>
@@ -206,7 +226,13 @@ function StockImpactCard({ impact }: { impact: StockImpactAnalysis }) {
   );
 }
 
-function NewsCard({ article }: { article: NewsArticle }) {
+function NewsCard({
+  article,
+  onOpenThesis,
+}: {
+  article: NewsArticle;
+  onOpenThesis?: (symbol: string) => void;
+}) {
   return (
     <article className="surface-2 rounded-2xl p-4 transition hover:border-slate-500/50">
       <div className="flex gap-4">
@@ -252,7 +278,11 @@ function NewsCard({ article }: { article: NewsArticle }) {
               </h4>
               <div className="grid gap-3 lg:grid-cols-2">
                 {article.stockImpacts.map((impact) => (
-                  <StockImpactCard key={impact.symbol} impact={impact} />
+                  <StockImpactCard
+                    key={impact.symbol}
+                    impact={impact}
+                    onOpenThesis={onOpenThesis}
+                  />
                 ))}
               </div>
             </div>
@@ -260,14 +290,25 @@ function NewsCard({ article }: { article: NewsArticle }) {
 
           {article.relatedTickers.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {article.relatedTickers.slice(0, 6).map((ticker) => (
-                <span
-                  key={ticker}
-                  className="rounded-md bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300"
-                >
-                  {ticker}
-                </span>
-              ))}
+              {article.relatedTickers.slice(0, 6).map((ticker) =>
+                onOpenThesis ? (
+                  <button
+                    key={ticker}
+                    type="button"
+                    onClick={() => onOpenThesis(ticker)}
+                    className="rounded-md bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300 transition hover:bg-blue-500/25"
+                  >
+                    {ticker}
+                  </button>
+                ) : (
+                  <span
+                    key={ticker}
+                    className="rounded-md bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300"
+                  >
+                    {ticker}
+                  </span>
+                )
+              )}
             </div>
           )}
         </div>
@@ -279,6 +320,7 @@ function NewsCard({ article }: { article: NewsArticle }) {
 export default function RecentNews({
   portfolioSymbols = [],
   active = true,
+  onOpenThesis,
 }: RecentNewsProps) {
   const [feed, setFeed] = useState<NewsFeed | null>(null);
   const [loading, setLoading] = useState(false);
@@ -471,6 +513,7 @@ export default function RecentNews({
               <EventCard
                 key={`${event.symbol}-${event.type}-${event.date}`}
                 event={event}
+                onOpenThesis={onOpenThesis}
               />
             ))}
           </div>
@@ -492,7 +535,11 @@ export default function RecentNews({
           ) : (
             <div className="space-y-3">
               {filteredArticles.map((article) => (
-                <NewsCard key={article.id} article={article} />
+                <NewsCard
+                  key={article.id}
+                  article={article}
+                  onOpenThesis={onOpenThesis}
+                />
               ))}
             </div>
           )}

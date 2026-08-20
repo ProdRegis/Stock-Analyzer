@@ -6,6 +6,8 @@ import BusinessQualityBadge from "./BusinessQualityBadge";
 import EmptyState from "./EmptyState";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
 import { Skeleton } from "./Skeleton";
+import { usePersistentStore } from "@/hooks/usePersistentStore";
+import { rememberThesis, recentThesesStore } from "@/lib/tab-memory";
 import type {
   InvestmentThesis as Thesis,
   MarketSearchResult,
@@ -245,6 +247,84 @@ function ThesisReport({
         <p className="mt-4 text-xs leading-relaxed text-slate-500">
           {thesis.valuation.explanation}
         </p>
+
+        {thesis.valuation.scenarios.length > 0 && (
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            {thesis.valuation.scenarios.map((row) => (
+              <div
+                key={row.id}
+                className={`rounded-xl px-3 py-2.5 ${
+                  row.id === "conservative"
+                    ? "border border-blue-500/30 bg-blue-500/10"
+                    : "bg-slate-800/40"
+                }`}
+              >
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                  {row.label}
+                </p>
+                <p className="mt-1 text-sm font-medium tabular-nums text-white">
+                  {formatPct(row.growth)} growth
+                </p>
+                <p className="text-xs tabular-nums text-slate-400">
+                  Implied{" "}
+                  {row.impliedReturn != null
+                    ? formatPct(row.impliedReturn)
+                    : "—"}
+                  {row.buyPrice != null
+                    ? ` · buy ${formatCurrency(row.buyPrice)}`
+                    : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {thesis.valuation.schedule && thesis.valuation.schedule.length > 0 && (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[28rem] text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="py-1.5 pr-3 font-medium">Year</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">Growth</th>
+                  <th className="py-1.5 pr-3 text-right font-medium">
+                    Cash flow
+                  </th>
+                  <th className="py-1.5 text-right font-medium">PV</th>
+                </tr>
+              </thead>
+              <tbody>
+                {thesis.valuation.schedule.map((row) => (
+                  <tr key={row.year} className="border-b border-slate-800/70">
+                    <td className="py-1.5 pr-3 text-slate-300">{row.year}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums text-slate-300">
+                      {formatPct(row.growth)}
+                    </td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums text-slate-200">
+                      {formatCash(row.cashFlow)}
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-white">
+                      {formatCash(row.presentValue)}
+                    </td>
+                  </tr>
+                ))}
+                {thesis.valuation.terminalPresentValue != null && (
+                  <tr>
+                    <td className="py-1.5 pr-3 text-slate-400" colSpan={3}>
+                      Terminal value (PV)
+                    </td>
+                    <td className="py-1.5 text-right tabular-nums text-white">
+                      {formatCash(thesis.valuation.terminalPresentValue)}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <p className="mt-2 text-[11px] text-slate-500">
+              Discounted at the implied return so present value matches the
+              market value used in the model.
+            </p>
+          </div>
+        )}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-3">
@@ -330,6 +410,31 @@ function ThesisReport({
         </section>
       )}
 
+      {thesis.notableHolders.length > 0 && (
+        <section className="surface-2 rounded-2xl p-5">
+          <h3 className="text-sm font-medium text-slate-200">
+            Also in concentrated 13Fs
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Among stock-pickers in Copy Trading — not giant multi-strategy
+            books. Weight is that manager&apos;s reported long-book share.
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {thesis.notableHolders.map((holder) => (
+              <li
+                key={holder.cik}
+                className="rounded-full border border-slate-700 bg-slate-800/50 px-3 py-1 text-xs text-slate-200"
+              >
+                {holder.person}
+                <span className="ml-1.5 text-slate-500">
+                  {(holder.weight * 100).toFixed(1)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <p className="text-xs leading-relaxed text-slate-500">
         Informational only — not financial advice. A thesis here is a structured
         reading of public filings snapshots and a reverse DCF, not a substitute
@@ -354,6 +459,8 @@ export default function InvestmentThesis({
   const [error, setError] = useState<string | null>(null);
   const [thesis, setThesis] = useState<Thesis | null>(null);
 
+  const recents = usePersistentStore(recentThesesStore);
+
   const loadThesis = useCallback(async (symbol: string, name?: string) => {
     setLoading(true);
     setError(null);
@@ -368,14 +475,22 @@ export default function InvestmentThesis({
       if (!response.ok) {
         throw new Error(data.error ?? "Thesis failed");
       }
-      setThesis(data as Thesis);
+      const next = data as Thesis;
+      setThesis(next);
+      rememberThesis({
+        symbol: next.symbol,
+        name: next.name,
+        stance: next.plan.stance,
+        buyAt: next.plan.buyAt,
+        at: Date.now(),
+      });
       setSelectedStock({
-        symbol: (data as Thesis).symbol,
-        name: (data as Thesis).name,
+        symbol: next.symbol,
+        name: next.name,
         exchange: "—",
         type: "Equity",
       });
-      setSearchQuery(`${(data as Thesis).symbol} — ${(data as Thesis).name}`);
+      setSearchQuery(`${next.symbol} — ${next.name}`);
     } catch (err) {
       setThesis(null);
       setError(err instanceof Error ? err.message : "Thesis failed");
@@ -454,11 +569,36 @@ export default function InvestmentThesis({
       {loading && <ThesisSkeleton />}
 
       {!loading && !thesis && !error && (
-        <EmptyState
-          icon={BookOpen}
-          title="No thesis yet"
-          description="Pick a company you think you understand. The goal is a plain-vanilla write-up you could defend, not a clever one-off trade."
-        />
+        <div className="space-y-4">
+          {recents.length > 0 && (
+            <section className="surface-2 rounded-2xl p-5">
+              <h3 className="text-sm font-medium text-slate-300">
+                Recent theses
+              </h3>
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {recents.map((row) => (
+                  <li key={row.symbol}>
+                    <button
+                      type="button"
+                      onClick={() => void loadThesis(row.symbol, row.name)}
+                      className="rounded-full border border-slate-700 bg-slate-800/50 px-3 py-1.5 text-left text-xs text-slate-200 transition hover:border-blue-500/40 hover:text-white"
+                    >
+                      <span className="font-medium text-white">{row.symbol}</span>
+                      <span className="ml-1.5 text-slate-500">
+                        {stanceCopy[row.stance].label}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <EmptyState
+            icon={BookOpen}
+            title="No thesis yet"
+            description="Pick a company you think you understand. The goal is a plain-vanilla write-up you could defend, not a clever one-off trade."
+          />
+        </div>
       )}
 
       {!loading && thesis && (

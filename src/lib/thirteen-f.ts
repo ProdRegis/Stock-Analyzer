@@ -1,11 +1,15 @@
 import { TTL, cached } from "./cache";
+import { resolveTickers } from "./cusip-ticker";
+import { searchMarket } from "./market-data";
 import { edgarHeaders } from "./edgar-headers";
 import {
   NOTABLE_INVESTORS,
+  holderScreenNotables,
   matchNotableInvestors,
   padCik,
 } from "./thirteen-f-filers";
 import type {
+  NotableHolder,
   ThirteenFFilerReport,
   ThirteenFHolding,
   ThirteenFPeriod,
@@ -87,6 +91,7 @@ export function parseThirteenFHoldings(xml: string): ThirteenFHolding[] {
       shares,
       shareType: xmlField(block, "sshPrnamtType") || "SH",
       putCall,
+      ticker: null,
     };
     const key = holdingKey(row);
     const existing = merged.get(key);
@@ -131,6 +136,7 @@ export function diffThirteenFHoldings(
         valueUsdAfter: now.valueUsd,
         shareChange: now.shares,
         valueChangeUsd: now.valueUsd,
+        ticker: null,
       });
       continue;
     }
@@ -146,6 +152,7 @@ export function diffThirteenFHoldings(
       valueUsdAfter: now.valueUsd,
       shareChange: now.shares - was.shares,
       valueChangeUsd: now.valueUsd - was.valueUsd,
+      ticker: null,
     });
   }
 
@@ -162,6 +169,7 @@ export function diffThirteenFHoldings(
       valueUsdAfter: 0,
       shareChange: -was.shares,
       valueChangeUsd: -was.valueUsd,
+      ticker: null,
     });
   }
 
@@ -185,6 +193,52 @@ export function presentThirteenFBook(
     holdings: holdings.slice(0, limit),
     trades: trades.slice(0, limit),
   };
+}
+
+export function holdingMatchesQuery(
+  row: { issuer: string; cusip: string; ticker?: string | null },
+  needles: string[]
+): boolean {
+  if (needles.length === 0) return true;
+  const hay = `${row.issuer} ${row.cusip} ${row.ticker ?? ""}`.toLowerCase();
+  return needles.some((needle) => needle.length >= 2 && hay.includes(needle));
+}
+
+export function filterThirteenFBook(
+  holdings: ThirteenFHolding[],
+  trades: ThirteenFTrade[],
+  needles: string[]
+): { holdings: ThirteenFHolding[]; trades: ThirteenFTrade[] } {
+  if (needles.length === 0) return { holdings, trades };
+  return {
+    holdings: holdings.filter((row) => holdingMatchesQuery(row, needles)),
+    trades: trades.filter((row) => holdingMatchesQuery(row, needles)),
+  };
+}
+
+export async function needlesForBookQuery(query: string): Promise<string[]> {
+  const trimmed = query.trim().toLowerCase();
+  if (trimmed.length < 2) return [];
+
+  const needles = new Set<string>([trimmed]);
+  if (/^[a-z][a-z0-9.-]{0,7}$/i.test(trimmed)) {
+    try {
+      const hits = await searchMarket(trimmed);
+      const name = hits[0]?.name;
+      if (name) {
+        for (const token of name
+          .toLowerCase()
+          .replace(/[^a-z0-9 ]+/g, " ")
+          .split(/\s+/)
+          .filter((token) => token.length > 2 && token !== "inc" && token !== "corp")) {
+          needles.add(token);
+        }
+      }
+    } catch {
+      // Issuer substring still works if Yahoo search is down.
+    }
+  }
+  return [...needles];
 }
 
 let lastSecCall = 0;
@@ -332,8 +386,67 @@ async function loadInfoTableXml(period: ThirteenFPeriod): Promise<string> {
 }
 
 export async function loadThirteenFReport(
-  cikInput: string
+  cikInput: string,
+  options: { query?: string } = {}
 ): Promise<ThirteenFFilerReport> {
+  const book = await loadThirteenFBook(cikInput);
+  const query = options.query?.trim() ?? "";
+  const needles = query.length >= 2 ? await needlesForBookQuery(query) : [];
+  const filtered = filterThirteenFBook(book.holdings, book.trades, needles);
+  const presented = presentThirteenFBook(filtered.holdings, filtered.trades);
+  const openedSource = needles.length > 0 ? filtered.trades : book.trades;
+  const opened = openedSource
+    .filter((row) => row.action === "opened")
+    .slice(0, 12);
+
+  const tickers = await resolveTickers([
+    ...presented.holdings,
+    ...presented.trades,
+    ...opened,
+  ]);
+
+  return {
+    cik: book.cik,
+    filerName: book.filerName,
+    person: book.person,
+    period: book.period,
+    previousPeriod: book.previousPeriod,
+    totalValueUsd: book.totalValueUsd,
+    holdingCount: book.holdings.length,
+    tradeCount: book.trades.length,
+    openedCount: book.trades.filter((row) => row.action === "opened").length,
+    holdings: applyCusipTickers(presented.holdings, tickers),
+    trades: applyCusipTickers(presented.trades, tickers),
+    opened: applyCusipTickers(opened, tickers),
+    query: query || null,
+    matchCount: needles.length > 0 ? filtered.holdings.length : null,
+    sourceUrl: book.sourceUrl,
+  };
+}
+
+interface ThirteenFBook {
+  cik: string;
+  filerName: string;
+  person: string | null;
+  period: ThirteenFPeriod;
+  previousPeriod: ThirteenFPeriod | null;
+  totalValueUsd: number;
+  holdings: ThirteenFHolding[];
+  trades: ThirteenFTrade[];
+  sourceUrl: string;
+}
+
+function applyCusipTickers<T extends { cusip: string; ticker: string | null }>(
+  rows: T[],
+  tickers: Map<string, string | null>
+): T[] {
+  return rows.map((row) => {
+    const cusip = row.cusip.replace(/\s/g, "").toUpperCase();
+    return { ...row, ticker: tickers.get(cusip) ?? row.ticker };
+  });
+}
+
+async function loadThirteenFBook(cikInput: string): Promise<ThirteenFBook> {
   const cik = padCik(cikInput);
   if (!/^\d{10}$/.test(cik) || cik === "0000000000") {
     throw new Error("That does not look like an SEC CIK.");
@@ -384,9 +497,76 @@ export async function loadThirteenFReport(
       period: currentPeriod,
       previousPeriod,
       totalValueUsd: holdings.reduce((sum, row) => sum + row.valueUsd, 0),
-      ...presentThirteenFBook(holdings, trades),
+      holdings,
+      trades,
       sourceUrl: currentPeriod.documentUrl,
     };
+  });
+}
+
+const HOLDER_TOP_HOLDINGS = 30;
+
+export async function notableHoldersForSymbol(
+  symbol: string
+): Promise<NotableHolder[]> {
+  const upper = symbol.trim().toUpperCase();
+  if (!upper) return [];
+
+  try {
+    const index = await loadNotableHolderIndex();
+    return index.get(upper) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function loadNotableHolderIndex(): Promise<Map<string, NotableHolder[]>> {
+  return cached("13f-holder-index", TTL.thirteenF, async () => {
+    const managers = holderScreenNotables();
+    const parts = await Promise.all(
+      managers.map(async (investor) => {
+        try {
+          const book = await loadThirteenFBook(investor.cik);
+          const top = book.holdings.slice(0, HOLDER_TOP_HOLDINGS);
+          const tickers = await resolveTickers(top);
+          return top
+            .map((row) => ({
+              ticker: tickers.get(row.cusip.replace(/\s/g, "").toUpperCase()),
+              weight: row.weight,
+              investor,
+            }))
+            .filter(
+              (
+                row
+              ): row is {
+                ticker: string;
+                weight: number;
+                investor: (typeof managers)[number];
+              } => Boolean(row.ticker)
+            );
+        } catch {
+          return [];
+        }
+      })
+    );
+
+    const index = new Map<string, NotableHolder[]>();
+    for (const row of parts.flat()) {
+      const list = index.get(row.ticker) ?? [];
+      if (list.some((holder) => holder.cik === row.investor.cik)) continue;
+      list.push({
+        person: row.investor.person,
+        filerName: row.investor.filerName,
+        cik: row.investor.cik,
+        weight: row.weight,
+      });
+      index.set(row.ticker, list);
+    }
+
+    for (const list of index.values()) {
+      list.sort((a, b) => b.weight - a.weight);
+    }
+    return index;
   });
 }
 

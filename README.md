@@ -36,11 +36,14 @@ still live on the Safety Stops tab.
 **Investment Thesis** — Search a ticker and get a structured write-up: whether
 to kick the name out, how the business creates / captures / protects value, a
 plain-vanilla thesis, the main ways it can be wrong, and a reverse DCF that
-solves for the return already priced in. Buy and sell prices are the levels
-where that implied return clears a Treasury-plus-8% hurdle or sags to
-Treasury-plus-4%. Loss-making or highly leveraged names are labeled Pass
-instead of inventing a buy price. Same-industry names from the scan universe
-are listed as comparisons, not alerts.
+solves for the return already priced in — including the year-by-year cash-flow
+table and a few growth haircuts, not just the punchline. Buy and sell prices
+are the levels where that implied return clears a Treasury-plus-8% hurdle or
+sags to Treasury-plus-4%. Loss-making or highly leveraged names are labeled
+Pass instead of inventing a buy price. Related names come from Yahoo's peer
+list. Concentrated 13F stock-pickers who hold the name are listed when that
+data is already in cache. Recent theses stay in this browser. **Thesis** on a
+holding, stop, headline, or 13F row jumps here.
 
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
 resistance and how past breakouts resolved, then lifts durable businesses
@@ -67,10 +70,13 @@ printing a number.
 
 **Copy Trading** — Type a person, fund, or CIK and pick from a dropdown of
 known 13F managers (Buffett, Ackman, and the rest of the list). Each name maps
-to the legal filer that actually reports, and the tab shows the latest Form 13F
-long book plus quarter-over-quarter share changes. Names without a parseable 13F
-(members of Congress, STOCK Act PDFs) are not included. Huge books show the top
-50 positions so a Citadel filing does not dump thousands of rows.
+to the legal filer that actually reports. The tab opens on quarter-over-quarter
+changes and pins new buys, then the long book. Issuers are mapped to tickers
+when Yahoo can resolve them, so you can open a thesis or see overlap with your
+portfolio. Search the book by issuer, ticker, or CUSIP — including names
+outside the top 50. Last manager is remembered. Names without a parseable 13F
+are not included. Huge books still show the top 50 by default so a Citadel
+filing does not dump thousands of rows.
 
 **News & Events** — High-impact headlines, upcoming earnings dates, and news
 filtered to the symbols you actually hold.

@@ -14,7 +14,9 @@ export async function GET(
 
   try {
     const { cik } = await params;
-    const report = await loadThirteenFReport(cik);
+    const report = await loadThirteenFReport(cik, {
+      query: new URL(request.url).searchParams.get("q") ?? undefined,
+    });
     return NextResponse.json(report, {
       headers: { "Cache-Control": "no-store, max-age=0" },
     });

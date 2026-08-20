@@ -122,6 +122,45 @@ export const NOTABLE_INVESTORS: NotableInvestor[] = [
   },
 ];
 
+/**
+ * Giant diversified books. Skip these when answering "who else holds this" —
+ * Citadel owning a name is not a copy-trade signal.
+ */
+export const BROAD_13F_CIKS = new Set([
+  "0001423053", // Citadel
+  "0001037389", // Renaissance
+  "0001009207", // D.E. Shaw
+  "0001603466", // Point72
+  "0001350694", // Bridgewater
+  "0001167483", // Tiger Global
+  "0001103804", // Viking
+  "0001535392", // Coatue
+]);
+
+export function concentratedNotables(): NotableInvestor[] {
+  return NOTABLE_INVESTORS.filter(
+    (investor) => !BROAD_13F_CIKS.has(investor.cik)
+  );
+}
+
+/** Stock-pickers used for “also in this 13F” on the thesis tab. */
+const HOLDER_SCREEN_CIKS = new Set([
+  "0001067983", // Buffett
+  "0001336528", // Ackman
+  "0001649339", // Burry
+  "0001536411", // Druckenmiller
+  "0001656456", // Tepper
+  "0001697748", // Wood
+  "0001061768", // Klarman
+  "0000921669", // Icahn
+]);
+
+export function holderScreenNotables(): NotableInvestor[] {
+  return NOTABLE_INVESTORS.filter((investor) =>
+    HOLDER_SCREEN_CIKS.has(investor.cik)
+  );
+}
+
 export function padCik(value: string): string {
   return value.replace(/\D/g, "").padStart(10, "0");
 }

@@ -44,6 +44,8 @@ export const TTL = {
    */
   thirteenF: 6 * 60 * 60_000,
   thirteenFSearch: 30 * 60_000,
+  /** CUSIP → ticker does not move with the market. */
+  cusipTicker: 7 * 24 * 60 * 60_000,
   /**
    * The sample scan every first-time visitor sees. Held long enough that the
    * full fan-out runs at most a handful of times an hour no matter how many

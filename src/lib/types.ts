@@ -343,6 +343,28 @@ export interface ThesisPeer {
   note: string;
 }
 
+export interface ThesisDcfYear {
+  year: number;
+  growth: number;
+  cashFlow: number;
+  presentValue: number;
+}
+
+export interface ThesisGrowthScenario {
+  id: "harsh" | "conservative" | "reported";
+  label: string;
+  growth: number;
+  impliedReturn: number | null;
+  buyPrice: number | null;
+}
+
+export interface NotableHolder {
+  person: string;
+  filerName: string;
+  cik: string;
+  weight: number;
+}
+
 export interface InvestmentThesis {
   symbol: string;
   name: string;
@@ -376,6 +398,9 @@ export interface InvestmentThesis {
     forwardPe: number | null;
     yearsToMarketMultiple: number | null;
     explanation: string;
+    schedule: ThesisDcfYear[] | null;
+    terminalPresentValue: number | null;
+    scenarios: ThesisGrowthScenario[];
   };
   plan: {
     stance: ThesisStance;
@@ -385,6 +410,7 @@ export interface InvestmentThesis {
     sellAt: number | null;
   };
   peers: ThesisPeer[];
+  notableHolders: NotableHolder[];
   sources: string[];
 }
 
@@ -473,6 +499,8 @@ export interface ThirteenFHolding {
   shareType: string;
   putCall: string | null;
   weight: number;
+  /** Yahoo ticker when the issuer name resolved. */
+  ticker: string | null;
 }
 
 export type ThirteenFTradeAction = "opened" | "added" | "reduced" | "exited";
@@ -488,6 +516,7 @@ export interface ThirteenFTrade {
   valueUsdAfter: number;
   shareChange: number;
   valueChangeUsd: number;
+  ticker: string | null;
 }
 
 export interface ThirteenFPeriod {
@@ -521,7 +550,12 @@ export interface ThirteenFFilerReport {
   totalValueUsd: number;
   holdingCount: number;
   tradeCount: number;
+  openedCount: number;
   holdings: ThirteenFHolding[];
   trades: ThirteenFTrade[];
+  /** Largest new positions this quarter, pinned above the change list. */
+  opened: ThirteenFTrade[];
+  query: string | null;
+  matchCount: number | null;
   sourceUrl: string;
 }

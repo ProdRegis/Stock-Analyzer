@@ -150,6 +150,67 @@ export function valueAtDiscountRate(
   return valueAt(input, rate);
 }
 
+export interface ReverseDcfYearRow {
+  year: number;
+  growth: number;
+  cashFlow: number;
+  presentValue: number;
+}
+
+export interface ReverseDcfSchedule {
+  years: ReverseDcfYearRow[];
+  terminalValue: number;
+  terminalPresentValue: number;
+  totalPresentValue: number;
+  discountRate: number;
+}
+
+/** Year-by-year cash flows and present values at a chosen discount rate. */
+export function dcfSchedule(
+  input: ReverseDcfInput,
+  discountRate: number
+): ReverseDcfSchedule | null {
+  if (
+    !(input.startingCashFlow > 0) ||
+    input.years < 1 ||
+    !Number.isFinite(discountRate)
+  ) {
+    return null;
+  }
+
+  const rates = fadedGrowthRates(
+    input.initialGrowth,
+    input.terminalGrowth,
+    input.years
+  );
+  const flows = projectCashFlows(input.startingCashFlow, rates);
+  const last = flows[flows.length - 1] ?? input.startingCashFlow;
+  const terminal = terminalValue(last, input.terminalGrowth, discountRate);
+
+  const years: ReverseDcfYearRow[] = flows.map((cashFlow, index) => {
+    const year = index + 1;
+    return {
+      year,
+      growth: rates[index] ?? 0,
+      cashFlow,
+      presentValue: cashFlow / (1 + discountRate) ** year,
+    };
+  });
+
+  const terminalPresentValue =
+    terminal / (1 + discountRate) ** flows.length;
+  const totalPresentValue =
+    years.reduce((sum, row) => sum + row.presentValue, 0) + terminalPresentValue;
+
+  return {
+    years,
+    terminalValue: terminal,
+    terminalPresentValue,
+    totalPresentValue,
+    discountRate,
+  };
+}
+
 /**
  * Haircut a reported growth rate into something you'd actually type into a
  * model: cap it, then take 70%. Negative growth is floored at zero in the
@@ -160,4 +221,15 @@ export function conservativeGrowth(reported: number | null): number {
   const capped = Math.min(0.15, Math.max(-0.05, reported));
   const haircut = capped * 0.7;
   return Math.max(0, haircut);
+}
+
+/** Reported growth, capped, with no extra haircut — the optimistic case. */
+export function cappedReportedGrowth(reported: number | null): number {
+  if (reported == null || !Number.isFinite(reported)) return 0.03;
+  return Math.min(0.15, Math.max(0, reported));
+}
+
+/** Half the conservative rate — a harsher fade if the snapshot is generous. */
+export function harshGrowth(reported: number | null): number {
+  return conservativeGrowth(reported) * 0.5;
 }

@@ -65,6 +65,12 @@ export const ACTIVE_PROFILE_STORAGE_KEY =
 export const SESSION_STARTED_STORAGE_KEY =
   "portfolio-risk-analyzer:session-started";
 
+export const RECENT_THESES_STORAGE_KEY =
+  "portfolio-risk-analyzer:recent-theses";
+
+export const LAST_COPY_TRADER_STORAGE_KEY =
+  "portfolio-risk-analyzer:last-copy-trader";
+
 /**
  * Keys holding per-person data. Each is suffixed with the profile id, so
  * switching profiles swaps the whole set. Add new personal data keys here and
@@ -73,4 +79,6 @@ export const SESSION_STARTED_STORAGE_KEY =
 export const PROFILE_SCOPED_KEYS = [
   PORTFOLIO_STORAGE_KEY,
   WORKING_PORTFOLIO_STORAGE_KEY,
+  RECENT_THESES_STORAGE_KEY,
+  LAST_COPY_TRADER_STORAGE_KEY,
 ] as const;

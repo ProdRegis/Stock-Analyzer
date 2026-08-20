@@ -7,13 +7,20 @@ import {
 } from "./fundamentals";
 import { fetchRiskFreeRate } from "./market-rates";
 import {
+  cappedReportedGrowth,
   conservativeGrowth,
+  dcfSchedule,
+  harshGrowth,
   impliedReturn,
   valueAtDiscountRate,
 } from "./reverse-dcf";
+import { notableHoldersForSymbol } from "./thirteen-f";
+import { yahooFinance } from "./yahoo-client";
 import type {
   BusinessQuality,
   InvestmentThesis,
+  NotableHolder,
+  ThesisGrowthScenario,
   ThesisPeer,
   ThesisScreenFlag,
   ThesisStance,
@@ -112,7 +119,20 @@ function buildScreen(fundamentals: CompanyFundamentals): {
   return { kickOut, kickOutReason, flags };
 }
 
+function snapshotIsThin(fundamentals: CompanyFundamentals): boolean {
+  const summary = fundamentals.summary?.trim() ?? "";
+  return (
+    summary.length < 40 &&
+    fundamentals.operatingMargins == null &&
+    fundamentals.profitMargins == null
+  );
+}
+
 function createValueCopy(fundamentals: CompanyFundamentals): string {
+  if (snapshotIsThin(fundamentals)) {
+    return "This snapshot does not say why a customer shows up. Read the 10-K business section before underwriting anything — the rest of this write-up cannot invent that.";
+  }
+
   const intro = firstSentences(fundamentals.summary, 2);
   const industry = fundamentals.industry ?? fundamentals.sector;
   const who = industry
@@ -127,6 +147,10 @@ function createValueCopy(fundamentals: CompanyFundamentals): string {
 }
 
 function captureValueCopy(fundamentals: CompanyFundamentals): string {
+  if (snapshotIsThin(fundamentals) || fundamentals.operatingMargins == null) {
+    return "How they keep a slice of the value is not in this snapshot. Do not skip that step — monetization is half the thesis.";
+  }
+
   const op = fundamentals.operatingMargins;
   const profit = fundamentals.profitMargins;
   const fcf = fundamentals.freeCashflow;
@@ -148,6 +172,10 @@ function captureValueCopy(fundamentals: CompanyFundamentals): string {
 }
 
 function protectValueCopy(fundamentals: CompanyFundamentals): string {
+  if (snapshotIsThin(fundamentals)) {
+    return "No numbers here that look like a barrier. Either find a first-principles reason a well-funded rival cannot copy this in the 10-K, or pass.";
+  }
+
   const op = fundamentals.operatingMargins ?? 0;
   const roe = fundamentals.returnOnEquity;
   const debt = fundamentals.debtToEquity ?? 0;
@@ -255,6 +283,40 @@ export interface ThesisBuildInput {
   quality: BusinessQuality;
   riskFreeRate: number;
   peers: ThesisPeer[];
+  notableHolders?: NotableHolder[];
+}
+
+function scenarioForGrowth(
+  growth: number,
+  base: {
+    startingCashFlow: number;
+    marketValue: number;
+    currentPrice: number;
+    hurdleRate: number;
+  },
+  id: ThesisGrowthScenario["id"],
+  label: string
+): ThesisGrowthScenario {
+  const input = {
+    startingCashFlow: base.startingCashFlow,
+    marketValue: base.marketValue,
+    initialGrowth: growth,
+    terminalGrowth: TERMINAL_GROWTH,
+    years: FORECAST_YEARS,
+  };
+  const implied = impliedReturn(input);
+  const buyValue = valueAtDiscountRate(input, base.hurdleRate);
+  return {
+    id,
+    label,
+    growth,
+    impliedReturn: implied,
+    buyPrice: scaleValueToPrice(
+      buyValue,
+      base.marketValue,
+      base.currentPrice
+    ),
+  };
 }
 
 export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis {
@@ -359,6 +421,51 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
       ? ` Forward P/E ${fundamentals.forwardPe.toFixed(1)} would need more than three years of ${pct(growth, 1)} growth just to sag toward a market multiple — a stretch.`
       : "";
 
+  const reportedGrowth = fundamentals.revenueGrowth ?? fundamentals.earningsGrowth;
+  const scenarios: ThesisGrowthScenario[] =
+    startingCashFlow != null && marketValue != null && marketValue > 0
+      ? [
+          scenarioForGrowth(
+            harshGrowth(reportedGrowth),
+            {
+              startingCashFlow,
+              marketValue,
+              currentPrice: fundamentals.currentPrice,
+              hurdleRate,
+            },
+            "harsh",
+            "Harsher haircut"
+          ),
+          scenarioForGrowth(
+            growth,
+            {
+              startingCashFlow,
+              marketValue,
+              currentPrice: fundamentals.currentPrice,
+              hurdleRate,
+            },
+            "conservative",
+            "Conservative (used)"
+          ),
+          scenarioForGrowth(
+            cappedReportedGrowth(reportedGrowth),
+            {
+              startingCashFlow,
+              marketValue,
+              currentPrice: fundamentals.currentPrice,
+              hurdleRate,
+            },
+            "reported",
+            "Capped reported"
+          ),
+        ]
+      : [];
+
+  const schedule =
+    dcfInput && implied != null
+      ? dcfSchedule(dcfInput, implied)
+      : null;
+
   return {
     symbol: fundamentals.symbol,
     name: fundamentals.name,
@@ -388,6 +495,16 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
       forwardPe: fundamentals.forwardPe,
       yearsToMarketMultiple: years,
       explanation: explanation + extra,
+      schedule: schedule
+        ? schedule.years.map((row) => ({
+            year: row.year,
+            growth: row.growth,
+            cashFlow: row.cashFlow,
+            presentValue: row.presentValue,
+          }))
+        : null,
+      terminalPresentValue: schedule?.terminalPresentValue ?? null,
+      scenarios,
     },
     plan: {
       stance,
@@ -397,45 +514,78 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
       sellAt: sellPrice,
     },
     peers,
+    notableHolders: input.notableHolders ?? [],
     sources: [
       "Yahoo Finance quoteSummary (profile, financials, key statistics)",
       "Reverse DCF of trailing FCF or earnings, growth haircut 30%, fade to 2.5%",
       "Live Treasury yield for the hurdle (rf + 8%) and sell rate (rf + 4%)",
+      "Yahoo recommendationsBySymbol for industry peers; concentrated 13F books for who else holds it",
     ],
   };
 }
 
 async function loadPeers(symbol: string): Promise<ThesisPeer[]> {
-  const group = peerSymbolsInUniverse(symbol, 4);
-  if (!group) return [];
+  const upper = symbol.trim().toUpperCase();
+  const recommended = await cached(
+    `peers:${upper}`,
+    TTL.quoteSummary,
+    async () => {
+      try {
+        const result = await yahooFinance.recommendationsBySymbol(upper);
+        const row = Array.isArray(result) ? result[0] : result;
+        return (row?.recommendedSymbols ?? [])
+          .map((item: { symbol?: string }) => item.symbol?.trim().toUpperCase())
+          .filter((item: string | undefined): item is string =>
+            Boolean(item) && item !== upper
+          )
+          .slice(0, 6);
+      } catch {
+        return [] as string[];
+      }
+    }
+  );
 
-  const peers: ThesisPeer[] = await Promise.all(
-    group.symbols.map(async (peerSymbol) => {
+  const fallback = peerSymbolsInUniverse(upper, 4);
+  const symbols = [
+    ...new Set([
+      ...recommended,
+      ...(fallback?.symbols ?? []),
+    ]),
+  ].slice(0, 4);
+
+  if (symbols.length === 0) return [];
+
+  const groupLabel = fallback?.group.toLowerCase() ?? "related";
+
+  return Promise.all(
+    symbols.map(async (peerSymbol) => {
       try {
         const fundamentals = await fetchFundamentals(peerSymbol);
         const quality = scoreBusinessQuality(fundamentals);
+        const fromYahoo = recommended.includes(peerSymbol);
+        let note = `Same ${groupLabel} group in the scan universe. Compare create / capture / protect against the name you just researched.`;
+        if (fromYahoo) {
+          note =
+            quality.grade === "Pass" || quality.grade === "Speculative"
+              ? `Yahoo groups this with ${upper}, but the business grades ${quality.grade.toLowerCase()} — comparison, not a shortcut.`
+              : `Same neighborhood as ${upper} on Yahoo's related-names list. Compare create / capture / protect.`;
+        }
         return {
           symbol: peerSymbol,
           name: fundamentals.name,
           grade: quality.grade,
-          note:
-            quality.grade === "Durable"
-              ? `Another ${group.group.toLowerCase()} name that clears the business screen.`
-              : quality.grade === "Pass" || quality.grade === "Speculative"
-                ? `Same group, but ${quality.grade.toLowerCase()} — useful as a comparison, not a shortcut.`
-                : `Same ${group.group.toLowerCase()} group. Compare create / capture / protect against the name you just researched.`,
+          note,
         };
       } catch {
         return {
           symbol: peerSymbol,
           name: peerSymbol,
           grade: null,
-          note: `Same ${group.group.toLowerCase()} group to study next.`,
+          note: `Related name to study next.`,
         };
       }
     })
   );
-  return peers;
 }
 
 export async function generateInvestmentThesis(
@@ -444,9 +594,10 @@ export async function generateInvestmentThesis(
   const upper = symbol.trim().toUpperCase();
 
   return cached(`thesis:${upper}`, TTL.quoteSummary, async () => {
-    const [fundamentals, rateInfo] = await Promise.all([
+    const [fundamentals, rateInfo, notableHolders] = await Promise.all([
       fetchFundamentals(upper),
       fetchRiskFreeRate(),
+      notableHoldersForSymbol(upper),
     ]);
 
     if (!fundamentals.currentPrice) {
@@ -461,6 +612,7 @@ export async function generateInvestmentThesis(
       quality,
       riskFreeRate: rateInfo.rate,
       peers,
+      notableHolders,
     });
   });
 }

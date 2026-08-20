@@ -113,4 +113,23 @@ describe("buildInvestmentThesis", () => {
     expect(thesis.quality.hardIndustry).toBe(true);
     expect(thesis.valuation.method).toBe("unavailable");
   });
+
+  it("does not invent create/capture copy when the snapshot is empty", () => {
+    const fundamentals = base({
+      summary: null,
+      operatingMargins: null,
+      profitMargins: null,
+      totalRevenue: null,
+    });
+    const thesis = buildInvestmentThesis({
+      fundamentals,
+      quality: scoreBusinessQuality(fundamentals),
+      riskFreeRate: 0.043,
+      peers: [],
+    });
+
+    expect(thesis.createValue.toLowerCase()).toContain("10-k");
+    expect(thesis.captureValue.toLowerCase()).toContain("snapshot");
+    expect(thesis.valuation.scenarios.length).toBeGreaterThan(0);
+  });
 });

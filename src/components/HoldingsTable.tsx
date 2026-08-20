@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { ChevronRight, LineChart } from "lucide-react";
+import OpenThesisButton from "./OpenThesisButton";
 import RiskBadge from "./RiskBadge";
 import StockCard from "./StockCard";
 import {
@@ -27,12 +28,14 @@ interface HoldingsTableProps {
     symbol: string,
     target: { targetPrice?: number; targetDate?: string }
   ) => void;
+  onOpenThesis?: (symbol: string) => void;
 }
 
 export default function HoldingsTable({
   analysis,
   holdings,
   onTargetChange,
+  onOpenThesis,
 }: HoldingsTableProps) {
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
 
@@ -142,6 +145,12 @@ export default function HoldingsTable({
                             <span className="font-semibold text-white">
                               {holding.symbol}
                             </span>
+                            {onOpenThesis && (
+                              <OpenThesisButton
+                                symbol={holding.symbol}
+                                onOpen={onOpenThesis}
+                              />
+                            )}
                             {sellNow && (
                               <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-200">
                                 Sell now
@@ -213,6 +222,7 @@ export default function HoldingsTable({
                           onTargetChange={(target) =>
                             onTargetChange(holding.symbol, target)
                           }
+                          onOpenThesis={onOpenThesis}
                         />
                       </td>
                     </tr>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   conservativeGrowth,
+  dcfSchedule,
   fadedGrowthRates,
   impliedReturn,
   presentValue,
@@ -112,5 +113,25 @@ describe("conservativeGrowth", () => {
 
   it("defaults when growth is missing", () => {
     expect(conservativeGrowth(null)).toBeCloseTo(0.03, 10);
+  });
+});
+
+describe("dcfSchedule", () => {
+  it("discounts each year so PV sums toward valueAtDiscountRate", () => {
+    const input = {
+      startingCashFlow: 100,
+      marketValue: 1_000,
+      initialGrowth: 0.05,
+      terminalGrowth: 0.025,
+      years: 8,
+    };
+    const rate = 0.1;
+    const schedule = dcfSchedule(input, rate);
+    expect(schedule).not.toBeNull();
+    expect(schedule!.years).toHaveLength(8);
+    expect(schedule!.totalPresentValue).toBeCloseTo(
+      valueAtDiscountRate(input, rate),
+      6
+    );
   });
 });
