@@ -39,6 +39,12 @@ export const TTL = {
   trending: 5 * 60_000,
   news: 5 * 60_000,
   /**
+   * 13F filings land once a quarter. Six hours is short enough to pick up a
+   * new drop without re-hitting EDGAR on every tab visit.
+   */
+  thirteenF: 6 * 60 * 60_000,
+  thirteenFSearch: 30 * 60_000,
+  /**
    * The sample scan every first-time visitor sees. Held long enough that the
    * full fan-out runs at most a handful of times an hour no matter how many
    * people land on the page.

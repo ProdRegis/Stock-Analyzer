@@ -9,7 +9,7 @@ and news into a single dashboard.
 
 ## Features
 
-The dashboard is organized into five tabs.
+The dashboard is organized into six tabs.
 
 **Portfolio Analysis** — Enter tickers, share counts, and optionally your
 average cost. Returns a weighted risk score built from volatility, beta,
@@ -50,6 +50,12 @@ invalidation, 1.5× and 2.0× ATR(14), and a volatility-based loss cap, plus a
 widened stop when the symbol has past dips that failed to recover — and the
 result shows the formula and rationale for the one selected rather than just
 printing a number.
+
+**Copy Trading** — Latest SEC Form 13F holdings for large managers (Berkshire,
+Pershing Square, Scion, Citadel, and others), plus a search box for a person,
+fund, or CIK. Quarter-over-quarter share changes are shown as opened / added /
+cut / exited. This is the official delayed long book, not live copy-trading
+and not a stock screener.
 
 **News & Events** — High-impact headlines, upcoming earnings dates, and news
 filtered to the symbols you actually hold.
@@ -147,8 +153,10 @@ Push the repository to GitHub, import it at
 [vercel.com/new](https://vercel.com/new), and add `SITE_PASSWORD` under
 **Settings → Environment Variables** before the first deploy.
 
-The scanner and batch endpoints fan out to many symbols, so they set
-`maxDuration = 60` to clear Vercel's default 10-second function timeout.
+The scanner, batch, and 13F endpoints fan out or parse large filings, so they
+set `maxDuration = 60` to clear Vercel's default 10-second function timeout.
+Copy Trading reads SEC EDGAR; if those requests return 403, set `SEC_USER_AGENT`
+to your app name and a contact email.
 
 ## How Risk Is Calculated
 
@@ -207,9 +215,10 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-230 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+236 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation, R² and reliability of the SPY regression), technical indicators (RSI, ATR, moving averages, support and
-resistance), sell-reminder urgency (price hit, due date, approaching), cache
+resistance), sell-reminder urgency (price hit, due date, approaching), 13F
+parse and quarter-over-quarter trades, cache
 behavior including coalescing and stale-on-error, rate limit enforcement, the
 password gate, profile isolation and migration, market hours across weekends
 and both daylight and standard time, and both import parsers including the

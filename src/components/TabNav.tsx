@@ -2,6 +2,7 @@
 
 import {
   Briefcase,
+  Landmark,
   Newspaper,
   ShieldAlert,
   Sparkles,
@@ -14,6 +15,7 @@ export type DashboardTab =
   | "breakouts"
   | "picks"
   | "stop-loss"
+  | "copy-trading"
   | "news";
 
 interface TabNavProps {
@@ -26,6 +28,7 @@ const tabs: Array<{ id: DashboardTab; label: string; icon: LucideIcon }> = [
   { id: "breakouts", label: "Breakout Scanner", icon: TrendingUp },
   { id: "picks", label: "Dips & Shorts", icon: Sparkles },
   { id: "stop-loss", label: "Safety Stops", icon: ShieldAlert },
+  { id: "copy-trading", label: "Copy Trading", icon: Landmark },
   { id: "news", label: "News & Events", icon: Newspaper },
 ];
 

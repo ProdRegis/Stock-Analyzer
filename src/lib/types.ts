@@ -386,3 +386,66 @@ export interface PortfolioAnalysis {
     correlationMatrix: number[][];
   };
 }
+
+/** One row from a Form 13F information table, after merging duplicate CUSIPs. */
+export interface ThirteenFHolding {
+  issuer: string;
+  titleOfClass: string;
+  cusip: string;
+  /** Market value in USD (13F reports thousands; this is × 1,000). */
+  valueUsd: number;
+  shares: number;
+  shareType: string;
+  putCall: string | null;
+  weight: number;
+}
+
+export type ThirteenFTradeAction = "opened" | "added" | "reduced" | "exited";
+
+export interface ThirteenFTrade {
+  action: ThirteenFTradeAction;
+  issuer: string;
+  cusip: string;
+  putCall: string | null;
+  sharesBefore: number;
+  sharesAfter: number;
+  valueUsdBefore: number;
+  valueUsdAfter: number;
+  shareChange: number;
+  valueChangeUsd: number;
+}
+
+export interface ThirteenFPeriod {
+  reportDate: string;
+  filingDate: string;
+  accession: string;
+  form: string;
+  documentUrl: string;
+}
+
+export interface NotableInvestor {
+  cik: string;
+  filerName: string;
+  person: string;
+  aliases: string[];
+}
+
+export interface ThirteenFSearchHit {
+  cik: string;
+  name: string;
+  person: string | null;
+  source: "notable" | "edgar";
+}
+
+export interface ThirteenFFilerReport {
+  cik: string;
+  filerName: string;
+  person: string | null;
+  period: ThirteenFPeriod;
+  previousPeriod: ThirteenFPeriod | null;
+  totalValueUsd: number;
+  holdingCount: number;
+  holdings: ThirteenFHolding[];
+  trades: ThirteenFTrade[];
+  sourceUrl: string;
+}

@@ -6,6 +6,7 @@ import BestStocksPicker from "./BestStocksPicker";
 import DemoBadge from "./DemoBadge";
 import EmptyState from "./EmptyState";
 import BreakoutScanner from "./BreakoutScanner";
+import CopyTrading from "./CopyTrading";
 import CorrelationHeatmap from "./CorrelationHeatmap";
 import HoldingsTable from "./HoldingsTable";
 import PortfolioAllocation from "./PortfolioAllocation";
@@ -275,6 +276,12 @@ export default function Dashboard() {
       {visited("stop-loss") && (
         <TabPanel active={activeTab === "stop-loss"}>
           <StopLossAdvisor holdings={holdings} />
+        </TabPanel>
+      )}
+
+      {visited("copy-trading") && (
+        <TabPanel active={activeTab === "copy-trading"}>
+          <CopyTrading active={activeTab === "copy-trading"} />
         </TabPanel>
       )}
 
