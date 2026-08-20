@@ -1,9 +1,9 @@
 import type { NotableInvestor } from "./types";
 
 /**
- * People the copy-trading search should autocomplete. 13F filers map a
- * famous person to the legal manager that actually files. House members
- * map to Clerk of the House STOCK Act reports — they do not file 13F.
+ * Well-known 13F filers. The person is who people search for; the CIK is the
+ * legal manager that actually files. Buffett does not file as himself —
+ * Berkshire Hathaway does. Only names with a parseable 13F book belong here.
  */
 export const NOTABLE_INVESTORS: NotableInvestor[] = [
   {
@@ -120,37 +120,7 @@ export const NOTABLE_INVESTORS: NotableInvestor[] = [
     person: "Cathie Wood",
     aliases: ["cathie", "cathy wood", "ark", "arkk", "ark invest"],
   },
-  {
-    cik: "congress:Pelosi:Nancy",
-    filerName: "U.S. House — STOCK Act PTRs",
-    person: "Nancy Pelosi",
-    aliases: [
-      "nancy",
-      "pelosi",
-      "nancy pelosi",
-      "speaker pelosi",
-      "paul pelosi",
-    ],
-    kind: "congress",
-  },
 ];
-
-export function isCongressFilerId(cik: string): boolean {
-  return cik.startsWith("congress:");
-}
-
-export function parseCongressFilerId(
-  cik: string
-): { last: string; first: string } | null {
-  if (!isCongressFilerId(cik)) return null;
-  const [, last, first] = cik.split(":");
-  if (!last || !first) return null;
-  return { last, first };
-}
-
-export function congressFilerId(last: string, first: string): string {
-  return `congress:${last}:${first}`;
-}
 
 export function padCik(value: string): string {
   return value.replace(/\D/g, "").padStart(10, "0");
@@ -170,13 +140,7 @@ export function matchNotableInvestors(query: string): NotableInvestor[] {
   const digits = digitsOnly.length >= 6 ? padCik(digitsOnly) : null;
 
   return NOTABLE_INVESTORS.filter((investor) => {
-    if (
-      digits &&
-      !isCongressFilerId(investor.cik) &&
-      padCik(investor.cik) === digits
-    ) {
-      return true;
-    }
+    if (digits && padCik(investor.cik) === digits) return true;
 
     const haystack = notableHaystack(investor);
     if (haystack.includes(needle)) return true;

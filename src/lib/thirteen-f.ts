@@ -1,6 +1,5 @@
 import { TTL, cached } from "./cache";
 import { edgarHeaders } from "./edgar-headers";
-import { searchHousePtrFilers } from "./house-ptr";
 import {
   NOTABLE_INVESTORS,
   matchNotableInvestors,
@@ -423,8 +422,7 @@ export async function searchThirteenFFilers(
         cik: investor.cik,
         name: investor.filerName,
         person: investor.person,
-        source: investor.kind === "congress" ? "congress" : "notable",
-        kind: investor.kind === "congress" ? "congress" : "13f",
+        source: "notable",
       }));
 
       const digits = trimmed.replace(/\D/g, "");
@@ -466,16 +464,6 @@ export async function searchThirteenFFilers(
         }
       } catch {
         // Curated matches still return if EDGAR search is down.
-      }
-
-      try {
-        for (const hit of await searchHousePtrFilers(trimmed)) {
-          if (notableHits.some((existing) => existing.cik === hit.cik)) continue;
-          notableHits.push(hit);
-          if (notableHits.length >= 12) break;
-        }
-      } catch {
-        // House Clerk is optional; notables still return.
       }
 
       return notableHits.slice(0, 12);

@@ -66,12 +66,11 @@ result shows the formula and rationale for the one selected rather than just
 printing a number.
 
 **Copy Trading** — Type a person, fund, or CIK and pick from a dropdown of
-known names (Buffett, Ackman, Pelosi, and the rest of the list). Large managers
-show the latest SEC Form 13F long book and quarter-over-quarter share changes.
-Members of Congress do not file 13F — Nancy Pelosi and other House names load
-STOCK Act Periodic Transaction Reports from the Clerk of the House, with links
-to the official PDFs. Huge 13F books show the top 50 positions so a Citadel
-filing does not dump thousands of rows.
+known 13F managers (Buffett, Ackman, and the rest of the list). Each name maps
+to the legal filer that actually reports, and the tab shows the latest Form 13F
+long book plus quarter-over-quarter share changes. Names without a parseable 13F
+(members of Congress, STOCK Act PDFs) are not included. Huge books show the top
+50 positions so a Citadel filing does not dump thousands of rows.
 
 **News & Events** — High-impact headlines, upcoming earnings dates, and news
 filtered to the symbols you actually hold.
@@ -171,11 +170,10 @@ Push the repository to GitHub, import it at
 
 The scanner, batch, and 13F endpoints fan out or parse large filings, so they
 set `maxDuration = 60` to clear Vercel's default 10-second function timeout.
-Copy Trading reads SEC EDGAR for 13F books and the Clerk of the House for
-STOCK Act reports. EDGAR 403s script-style User-Agents from cloud hosts; the
-app sends a browser-like User-Agent by default. Leave `SEC_USER_AGENT` unset
-unless you have a string that you have already confirmed works against
-`data.sec.gov`.
+Copy Trading reads SEC EDGAR for 13F books. EDGAR 403s script-style
+User-Agents from cloud hosts; the app sends a browser-like User-Agent by
+default. Leave `SEC_USER_AGENT` unset unless you have a string that you have
+already confirmed works against `data.sec.gov`.
 
 ## How Risk Is Calculated
 

@@ -6,25 +6,15 @@ import EmptyState from "./EmptyState";
 import { Skeleton } from "./Skeleton";
 import {
   NOTABLE_INVESTORS,
-  isCongressFilerId,
   matchNotableInvestors,
-  parseCongressFilerId,
 } from "@/lib/thirteen-f-filers";
 import type {
-  CongressFilerReport,
   ThirteenFFilerReport,
   ThirteenFSearchHit,
   ThirteenFTradeAction,
 } from "@/lib/types";
 
 type DetailTab = "holdings" | "trades";
-type LoadedReport = ThirteenFFilerReport | CongressFilerReport;
-
-function isCongressReport(
-  report: LoadedReport
-): report is CongressFilerReport {
-  return "kind" in report && report.kind === "congress";
-}
 
 function hitFromNotable(
   investor: (typeof NOTABLE_INVESTORS)[number]
@@ -33,8 +23,7 @@ function hitFromNotable(
     cik: investor.cik,
     name: investor.filerName,
     person: investor.person,
-    source: investor.kind === "congress" ? "congress" : "notable",
-    kind: investor.kind === "congress" ? "congress" : "13f",
+    source: "notable",
   };
 }
 
@@ -91,7 +80,7 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selectedCik, setSelectedCik] = useState<string | null>(null);
-  const [report, setReport] = useState<LoadedReport | null>(null);
+  const [report, setReport] = useState<ThirteenFFilerReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<DetailTab>("holdings");
@@ -108,21 +97,13 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
     if (label) setQuery(label);
 
     try {
-      const congress = parseCongressFilerId(cik);
       const response = await fetch(
-        congress
-          ? `/api/copy-trading/congress?last=${encodeURIComponent(congress.last)}&first=${encodeURIComponent(congress.first)}`
-          : `/api/copy-trading/${encodeURIComponent(cik)}`,
+        `/api/copy-trading/${encodeURIComponent(cik)}`,
         { cache: "no-store" }
       );
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(
-          data.error ??
-            (congress
-              ? "Failed to load STOCK Act filings"
-              : "Failed to load 13F")
-        );
+        throw new Error(data.error ?? "Failed to load 13F");
       }
       setReport(data);
     } catch (err) {
@@ -203,10 +184,9 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
           <div>
             <h2 className="text-lg font-semibold text-white">Copy Trading</h2>
             <p className="mt-1 max-w-3xl text-sm text-slate-400">
-              Official filings for people you might actually type in the box —
-              13F books for large US managers, and House STOCK Act reports for
-              members of Congress (Pelosi does not file a 13F). Type a name and
-              pick from the dropdown.
+              Latest SEC Form 13F holdings for large US managers. Type a name
+              and pick from the dropdown — only filers with a parseable 13F
+              book are listed.
             </p>
           </div>
         </div>
@@ -226,7 +206,6 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
           </li>
           <li>
             Famous people usually file through a firm. Buffett → Berkshire.
-            Members of Congress file STOCK Act reports, not 13F.
           </li>
         </ul>
 
@@ -280,7 +259,7 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
                   setDropdownOpen(false);
                 }
               }}
-              placeholder="Nancy, Buffett, Ackman, Burry, Citadel…"
+              placeholder="Buffett, Ackman, Burry, Citadel…"
               className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
             />
           </label>
@@ -290,43 +269,35 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
               role="listbox"
               className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-xl"
             >
-              {shownHits.map((hit, index) => {
-                const congress =
-                  hit.kind === "congress" || isCongressFilerId(hit.cik);
-                return (
-                  <li key={hit.cik} role="option" aria-selected={index === highlighted}>
-                    <button
-                      type="button"
-                      onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => pickHit(hit)}
-                      className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left ${
-                        index === highlighted ? "bg-slate-800" : "hover:bg-slate-800/60"
-                      }`}
-                    >
-                      <span>
-                        <span className="block text-sm font-medium text-white">
-                          {hit.person ?? hit.name}
-                        </span>
-                        <span className="block text-xs text-slate-500">
-                          {hit.person ? hit.name : `CIK ${hit.cik}`}
-                        </span>
+              {shownHits.map((hit, index) => (
+                <li key={hit.cik} role="option" aria-selected={index === highlighted}>
+                  <button
+                    type="button"
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => pickHit(hit)}
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left ${
+                      index === highlighted ? "bg-slate-800" : "hover:bg-slate-800/60"
+                    }`}
+                  >
+                    <span>
+                      <span className="block text-sm font-medium text-white">
+                        {hit.person ?? hit.name}
                       </span>
-                      <span className="shrink-0 text-[11px] uppercase tracking-wide text-slate-600">
-                        {congress
-                          ? "STOCK Act"
-                          : hit.source === "edgar"
-                            ? "EDGAR"
-                            : "13F"}
+                      <span className="block text-xs text-slate-500">
+                        {hit.person ? hit.name : `CIK ${hit.cik}`}
                       </span>
-                    </button>
-                  </li>
-                );
-              })}
+                    </span>
+                    <span className="shrink-0 text-[11px] uppercase tracking-wide text-slate-600">
+                      {hit.source === "edgar" ? "EDGAR" : "13F"}
+                    </span>
+                  </button>
+                </li>
+              ))}
             </ul>
           )}
           {query.trim().length >= 2 && searching && (
             <p className="mt-2 text-xs text-slate-500">
-              Checking EDGAR and House filings…
+              Checking EDGAR…
             </p>
           )}
           {query.trim().length >= 2 && searchError && (
@@ -342,7 +313,6 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {NOTABLE_INVESTORS.map((investor) => {
             const selected = selectedCik === investor.cik;
-            const congress = investor.kind === "congress";
             return (
               <button
                 key={investor.cik}
@@ -358,11 +328,6 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
                   {investor.person}
                 </p>
                 <p className="text-xs text-slate-500">{investor.filerName}</p>
-                {congress && (
-                  <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-600">
-                    STOCK Act · not 13F
-                  </p>
-                )}
               </button>
             );
           })}
@@ -387,84 +352,11 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
         <EmptyState
           icon={Landmark}
           title="Pick a manager to see the filing"
-          description="Type a name — Nancy, Buffett, Ackman — and pick from the dropdown, or tap a person above."
+          description="Type a name — Buffett, Ackman — and pick from the dropdown, or tap a person above."
         />
       )}
 
-      {report && !loading && isCongressReport(report) && (
-        <section className="surface-2 overflow-hidden rounded-2xl">
-          <div className="border-b border-slate-800 px-5 py-4">
-            <p className="text-lg font-semibold text-white">{report.person}</p>
-            <p className="text-sm text-slate-400">{report.filerName}</p>
-            {report.district && (
-              <p className="mt-1 text-xs text-slate-500">
-                District {report.district}
-              </p>
-            )}
-            <p className="mt-2 text-sm text-slate-400">
-              Members of Congress do not file 13F. These are Periodic
-              Transaction Reports from the Clerk of the House. Tickers and
-              dollar ranges are in the PDF — this list is the filing index.
-            </p>
-            <a
-              href={report.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 inline-block text-xs text-blue-400 hover:text-blue-300"
-            >
-              House financial disclosure search
-            </a>
-          </div>
-          {report.filings.length === 0 ? (
-            <p className="px-5 py-8 text-sm text-slate-500">
-              No periodic transaction reports in the current Clerk index.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[32rem] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-800 text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-2.5 font-medium">Filed</th>
-                    <th className="px-3 py-2.5 font-medium">Type</th>
-                    <th className="px-3 py-2.5 font-medium">Document</th>
-                    <th className="px-4 py-2.5 text-right font-medium">PDF</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.filings.map((filing) => (
-                    <tr
-                      key={filing.docId + filing.filingDate}
-                      className="border-b border-slate-800/80"
-                    >
-                      <td className="px-4 py-2.5 tabular-nums text-slate-200">
-                        {filing.filingDate}
-                      </td>
-                      <td className="px-3 py-2.5 text-slate-300">
-                        {filing.filingType}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-slate-400">
-                        {filing.docId}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <a
-                          href={filing.pdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-blue-400 hover:text-blue-300"
-                        >
-                          Open
-                        </a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
-
-      {report && !loading && !isCongressReport(report) && (
+      {report && !loading && (
         <section className="surface-2 overflow-hidden rounded-2xl">
           <div className="border-b border-slate-800 px-5 py-4">
             <p className="text-lg font-semibold text-white">

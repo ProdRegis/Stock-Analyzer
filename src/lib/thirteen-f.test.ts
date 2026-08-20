@@ -82,9 +82,9 @@ describe("matchNotableInvestors", () => {
     expect(matchNotableInvestors("1336528")[0]?.person).toBe("Bill Ackman");
   });
 
-  it("suggests Nancy Pelosi from nancy — she does not file 13F", () => {
-    const hits = matchNotableInvestors("nancy");
-    expect(hits.some((hit) => hit.person === "Nancy Pelosi")).toBe(true);
+  it("does not suggest names without a 13F book", () => {
+    expect(matchNotableInvestors("nancy")).toHaveLength(0);
+    expect(matchNotableInvestors("pelosi")).toHaveLength(0);
   });
 });
 

@@ -503,34 +503,13 @@ export interface NotableInvestor {
   filerName: string;
   person: string;
   aliases: string[];
-  /** 13F managers vs House STOCK Act filers. Defaults to 13F. */
-  kind?: "13f" | "congress";
 }
 
 export interface ThirteenFSearchHit {
   cik: string;
   name: string;
   person: string | null;
-  source: "notable" | "edgar" | "congress";
-  kind?: "13f" | "congress";
-}
-
-export interface CongressPtrFiling {
-  filingDate: string;
-  year: string;
-  docId: string;
-  filingType: string;
-  district: string;
-  pdfUrl: string;
-}
-
-export interface CongressFilerReport {
-  kind: "congress";
-  person: string;
-  filerName: string;
-  district: string | null;
-  filings: CongressPtrFiling[];
-  sourceUrl: string;
+  source: "notable" | "edgar";
 }
 
 export interface ThirteenFFilerReport {
