@@ -1,9 +1,9 @@
 import type { NotableInvestor } from "./types";
 
 /**
- * Well-known 13F filers. The person is who people search for; the CIK is the
- * legal manager that actually files. Buffett does not file as himself —
- * Berkshire Hathaway does.
+ * People the copy-trading search should autocomplete. 13F filers map a
+ * famous person to the legal manager that actually files. House members
+ * map to Clerk of the House STOCK Act reports — they do not file 13F.
  */
 export const NOTABLE_INVESTORS: NotableInvestor[] = [
   {
@@ -114,31 +114,73 @@ export const NOTABLE_INVESTORS: NotableInvestor[] = [
     person: "Andreas Halvorsen",
     aliases: ["viking", "halvorsen"],
   },
+  {
+    cik: "0001697748",
+    filerName: "ARK Investment Management",
+    person: "Cathie Wood",
+    aliases: ["cathie", "cathy wood", "ark", "arkk", "ark invest"],
+  },
+  {
+    cik: "congress:Pelosi:Nancy",
+    filerName: "U.S. House — STOCK Act PTRs",
+    person: "Nancy Pelosi",
+    aliases: [
+      "nancy",
+      "pelosi",
+      "nancy pelosi",
+      "speaker pelosi",
+      "paul pelosi",
+    ],
+    kind: "congress",
+  },
 ];
+
+export function isCongressFilerId(cik: string): boolean {
+  return cik.startsWith("congress:");
+}
+
+export function parseCongressFilerId(
+  cik: string
+): { last: string; first: string } | null {
+  if (!isCongressFilerId(cik)) return null;
+  const [, last, first] = cik.split(":");
+  if (!last || !first) return null;
+  return { last, first };
+}
+
+export function congressFilerId(last: string, first: string): string {
+  return `congress:${last}:${first}`;
+}
 
 export function padCik(value: string): string {
   return value.replace(/\D/g, "").padStart(10, "0");
 }
 
+function notableHaystack(investor: NotableInvestor): string {
+  return [investor.filerName, investor.person, ...investor.aliases]
+    .join(" ")
+    .toLowerCase();
+}
+
 export function matchNotableInvestors(query: string): NotableInvestor[] {
   const needle = query.trim().toLowerCase();
-  if (!needle) return [];
+  if (!needle) return [...NOTABLE_INVESTORS];
 
-  const cik = needle.replace(/\D/g, "");
-  const digits = cik.length >= 6 ? padCik(cik) : null;
+  const digitsOnly = needle.replace(/\D/g, "");
+  const digits = digitsOnly.length >= 6 ? padCik(digitsOnly) : null;
 
   return NOTABLE_INVESTORS.filter((investor) => {
-    if (digits && investor.cik === digits) return true;
-    const haystack = [
-      investor.filerName,
-      investor.person,
-      ...investor.aliases,
-    ]
-      .join(" ")
-      .toLowerCase();
-    return (
-      haystack.includes(needle) ||
-      investor.aliases.some((alias) => needle.includes(alias))
-    );
+    if (
+      digits &&
+      !isCongressFilerId(investor.cik) &&
+      padCik(investor.cik) === digits
+    ) {
+      return true;
+    }
+
+    const haystack = notableHaystack(investor);
+    if (haystack.includes(needle)) return true;
+
+    return haystack.split(/[^a-z0-9]+/).some((word) => word.startsWith(needle));
   });
 }

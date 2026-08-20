@@ -1,4 +1,6 @@
 import { TTL, cached } from "./cache";
+import { edgarHeaders } from "./edgar-headers";
+import { searchHousePtrFilers } from "./house-ptr";
 import {
   NOTABLE_INVESTORS,
   matchNotableInvestors,
@@ -26,13 +28,6 @@ export const THIRTEEN_F_DISPLAY_LIMIT = 50;
 
 const INFO_TABLE_RE =
   /<(?:[\w.]+:)?infoTable\b[^>]*>([\s\S]*?)<\/(?:[\w.]+:)?infoTable>/gi;
-
-function secUserAgent(): string {
-  return (
-    process.env.SEC_USER_AGENT?.trim() ||
-    "PortfolioRiskAnalyzer/1.0 (https://github.com/ProdRegis/Stock-Analyzer; 13f-reader)"
-  );
-}
 
 function decodeXml(value: string): string {
   return value
@@ -203,10 +198,7 @@ async function secFetch(url: string): Promise<Response> {
   lastSecCall = Date.now();
 
   const response = await fetch(url, {
-    headers: {
-      "User-Agent": secUserAgent(),
-      Accept: "application/json, application/xml, text/xml, */*",
-    },
+    headers: edgarHeaders(),
     cache: "no-store",
   });
 
@@ -214,7 +206,7 @@ async function secFetch(url: string): Promise<Response> {
     throw new Error(
       `SEC EDGAR returned ${response.status} for ${url}. ${
         response.status === 403
-          ? "Set SEC_USER_AGENT to your app name and a contact email."
+          ? "EDGAR is blocking this server. Retry in a minute; if it keeps failing, the SEC is refusing this hosting IP."
           : "Try again in a moment."
       }`
     );
@@ -431,7 +423,8 @@ export async function searchThirteenFFilers(
         cik: investor.cik,
         name: investor.filerName,
         person: investor.person,
-        source: "notable",
+        source: investor.kind === "congress" ? "congress" : "notable",
+        kind: investor.kind === "congress" ? "congress" : "13f",
       }));
 
       const digits = trimmed.replace(/\D/g, "");
@@ -473,6 +466,16 @@ export async function searchThirteenFFilers(
         }
       } catch {
         // Curated matches still return if EDGAR search is down.
+      }
+
+      try {
+        for (const hit of await searchHousePtrFilers(trimmed)) {
+          if (notableHits.some((existing) => existing.cik === hit.cik)) continue;
+          notableHits.push(hit);
+          if (notableHits.length >= 12) break;
+        }
+      } catch {
+        // House Clerk is optional; notables still return.
       }
 
       return notableHits.slice(0, 12);

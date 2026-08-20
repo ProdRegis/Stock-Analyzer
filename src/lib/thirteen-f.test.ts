@@ -81,6 +81,11 @@ describe("matchNotableInvestors", () => {
   it("matches a CIK pasted with or without leading zeros", () => {
     expect(matchNotableInvestors("1336528")[0]?.person).toBe("Bill Ackman");
   });
+
+  it("suggests Nancy Pelosi from nancy — she does not file 13F", () => {
+    const hits = matchNotableInvestors("nancy");
+    expect(hits.some((hit) => hit.person === "Nancy Pelosi")).toBe(true);
+  });
 });
 
 describe("parseThirteenFHoldings", () => {
