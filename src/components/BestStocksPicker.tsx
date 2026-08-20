@@ -5,6 +5,7 @@ import { Filter, Sparkles } from "lucide-react";
 import DemoBadge from "./DemoBadge";
 import EmptyState from "./EmptyState";
 import PriceChart from "./PriceChart";
+import BusinessQualityBadge from "./BusinessQualityBadge";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
 import StopLossReasonList from "./StopLossReasonList";
 import { formatMarketState } from "@/lib/format";
@@ -171,7 +172,13 @@ function DirectionBadge({ direction }: { direction: TradeDirection }) {
   );
 }
 
-function DipCandidateCard({ candidate }: { candidate: DipCandidate }) {
+function DipCandidateCard({
+  candidate,
+  onOpenThesis,
+}: {
+  candidate: DipCandidate;
+  onOpenThesis?: (symbol: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -181,6 +188,16 @@ function DipCandidateCard({ candidate }: { candidate: DipCandidate }) {
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-xl font-semibold text-white">{candidate.symbol}</h3>
             <DirectionBadge direction={candidate.direction} />
+            <BusinessQualityBadge quality={candidate.businessQuality} size="sm" />
+            {onOpenThesis && (
+              <button
+                type="button"
+                onClick={() => onOpenThesis(candidate.symbol)}
+                className="rounded-full border border-slate-700 px-2.5 py-1 text-xs font-medium text-blue-300 transition hover:border-blue-500/40 hover:text-blue-200"
+              >
+                Open thesis
+              </button>
+            )}
             <span className="rounded-full bg-blue-500/15 px-3 py-1 text-sm font-medium text-blue-300">
               {candidate.recoveryScore}% score
             </span>
@@ -420,8 +437,10 @@ function DipCandidateCard({ candidate }: { candidate: DipCandidate }) {
 
 export default function BestStocksPicker({
   active = true,
+  onOpenThesis,
 }: {
   active?: boolean;
+  onOpenThesis?: (symbol: string) => void;
 }) {
   const [candidates, setCandidates] = useState<DipCandidate[]>([]);
   const candidatesRef = useRef<DipCandidate[]>([]);
@@ -606,8 +625,10 @@ export default function BestStocksPicker({
             </div>
             <p className="mt-1 text-sm text-slate-500">
               Scans for the biggest dips likely to bounce (longs) and breakdown /
-              overextension setups (shorts). The top {LIVE_REFRESH_LIMIT} picks update
-              live every second; the rest hold their scan-time values.
+              overextension setups (shorts). Durable businesses — profitable, with
+              a real margin — rank above similar chart setups that look
+              speculative. The top {LIVE_REFRESH_LIMIT} picks update live every
+              second; the rest hold their scan-time values.
             </p>
           </div>
           <div className="text-right text-xs text-slate-500">
@@ -753,9 +774,11 @@ export default function BestStocksPicker({
         </div>
 
         <p className="mt-3 text-xs text-slate-500">
-          Predictions use RSI, support levels, and historical dip recovery patterns —
-          educational estimates only, not financial advice. Safety stops are suggested
-          limit-sell levels based on support, ATR, and volatility — not guaranteed fills.
+          Predictions use RSI, support levels, historical dip recovery, and a
+          business-quality overlay from filings (profit, cash flow, leverage) —
+          educational estimates only, not financial advice. Safety stops are
+          suggested limit-sell levels based on support, ATR, and volatility — not
+          guaranteed fills.
         </p>
       </section>
 
@@ -798,6 +821,7 @@ export default function BestStocksPicker({
               <DipCandidateCard
                 key={`${candidate.symbol}-${candidate.direction}`}
                 candidate={candidate}
+                onOpenThesis={onOpenThesis}
               />
             ))
           )}

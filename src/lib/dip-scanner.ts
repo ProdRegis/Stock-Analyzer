@@ -33,6 +33,7 @@ import type {
   SymbolMarketContext,
 } from "./types";
 import { rankDipCandidates } from "./ranking";
+import { attachBusinessQuality } from "./business-quality";
 
 function addTradingDays(from: Date, days: number): Date {
   const result = new Date(from);
@@ -596,7 +597,7 @@ export async function scanForDips(
     scannedAt,
     scanned: universe.length,
     sensitivity: singleLookup ? "broad" : sensitivity,
-    candidates,
+    candidates: rankDipCandidates(await attachBusinessQuality(candidates)),
   };
 }
 

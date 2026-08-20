@@ -17,6 +17,7 @@ import {
 } from "./technical";
 import type { BreakoutCandidate } from "./types";
 import { rankBreakoutCandidates } from "./ranking";
+import { attachBusinessQuality } from "./business-quality";
 
 export async function getScanUniverse(
   extraSymbols: string[] = [],
@@ -147,9 +148,11 @@ export async function scanForBreakouts(
   return {
     scannedAt,
     candidates: rankBreakoutCandidates(
-      candidates
-        .filter((candidate): candidate is BreakoutCandidate => candidate !== null)
-        .filter((candidate) => candidate.likelihoodScore >= effectiveMinScore)
+      await attachBusinessQuality(
+        candidates
+          .filter((candidate): candidate is BreakoutCandidate => candidate !== null)
+          .filter((candidate) => candidate.likelihoodScore >= effectiveMinScore)
+      )
     ),
   };
 }

@@ -21,6 +21,9 @@ const SEC_EFTS = "https://efts.sec.gov/LATEST/search-index";
 /** 13F Column 4 is reported in thousands of dollars. */
 export const VALUE_THOUSANDS = 1_000;
 
+/** Citadel-scale books are thousands of rows; the UI only needs the top slice. */
+export const THIRTEEN_F_DISPLAY_LIMIT = 50;
+
 const INFO_TABLE_RE =
   /<(?:[\w.]+:)?infoTable\b[^>]*>([\s\S]*?)<\/(?:[\w.]+:)?infoTable>/gi;
 
@@ -171,6 +174,23 @@ export function diffThirteenFHoldings(
   return trades.sort(
     (a, b) => Math.abs(b.valueChangeUsd) - Math.abs(a.valueChangeUsd)
   );
+}
+
+/** Keep totals for the whole book, but only send the top slice to the client. */
+export function presentThirteenFBook(
+  holdings: ThirteenFHolding[],
+  trades: ThirteenFTrade[],
+  limit = THIRTEEN_F_DISPLAY_LIMIT
+): Pick<
+  ThirteenFFilerReport,
+  "holdingCount" | "tradeCount" | "holdings" | "trades"
+> {
+  return {
+    holdingCount: holdings.length,
+    tradeCount: trades.length,
+    holdings: holdings.slice(0, limit),
+    trades: trades.slice(0, limit),
+  };
 }
 
 let lastSecCall = 0;
@@ -373,9 +393,7 @@ export async function loadThirteenFReport(
       period: currentPeriod,
       previousPeriod,
       totalValueUsd: holdings.reduce((sum, row) => sum + row.valueUsd, 0),
-      holdingCount: holdings.length,
-      holdings,
-      trades,
+      ...presentThirteenFBook(holdings, trades),
       sourceUrl: currentPeriod.documentUrl,
     };
   });

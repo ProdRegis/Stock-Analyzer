@@ -9,7 +9,7 @@ and news into a single dashboard.
 
 ## Features
 
-The dashboard is organized into six tabs.
+The dashboard is organized into seven tabs.
 
 **Portfolio Analysis** — Enter tickers, share counts, and optionally your
 average cost. Returns a weighted risk score built from volatility, beta,
@@ -33,16 +33,30 @@ with the portfolio. A price hit or a due date surfaces at the top of that
 section so you do not have to open every row. This is not a stop-loss — stops
 still live on the Safety Stops tab.
 
+**Investment Thesis** — Search a ticker and get a structured write-up: whether
+to kick the name out, how the business creates / captures / protects value, a
+plain-vanilla thesis, the main ways it can be wrong, and a reverse DCF that
+solves for the return already priced in. Buy and sell prices are the levels
+where that implied return clears a Treasury-plus-8% hurdle or sags to
+Treasury-plus-4%. Loss-making or highly leveraged names are labeled Pass
+instead of inventing a buy price. Same-industry names from the scan universe
+are listed as comparisons, not alerts.
+
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
-resistance and how past breakouts resolved. Search accepts either a ticker or a
-company name.
+resistance and how past breakouts resolved, then lifts durable businesses
+(profitable, real margins) above similar chart setups that look speculative.
+Search accepts either a ticker or a company name. **Open thesis** jumps to the
+Investment Thesis tab for that name.
 
 **Dips & Shorts** — Finds oversold candidates and pairs each one with an entry
 case, expected timing, and a stop level. Sweeps a universe of roughly 85 liquid
 large caps plus the day's trending symbols. A strict/balanced/broad control sets
 how weak a setup may be and still show up, since on a calm day very little
-clears the default screen. The top 12 picks refresh every second; the rest hold
-their scan-time values so the poll payload stays bounded.
+clears the default screen. After the technical screen, a business-quality grade
+from filings (profit, cash flow, leverage) re-ranks the list so a dip in a
+durable earner beats a similar dip in a speculative name. The top 12 picks
+refresh every second; the rest hold their scan-time values so the poll payload
+stays bounded.
 
 **Safety Stops** — Recommends a stop-loss price for every holding at once, with
 the reasoning behind each. Several candidates are evaluated — support
@@ -54,8 +68,9 @@ printing a number.
 **Copy Trading** — Latest SEC Form 13F holdings for large managers (Berkshire,
 Pershing Square, Scion, Citadel, and others), plus a search box for a person,
 fund, or CIK. Quarter-over-quarter share changes are shown as opened / added /
-cut / exited. This is the official delayed long book, not live copy-trading
-and not a stock screener.
+cut / exited. Huge books show the top 50 positions (and the largest share
+changes) so a Citadel filing does not dump thousands of rows. This is the
+official delayed long book, not live copy-trading and not a stock screener.
 
 **News & Events** — High-impact headlines, upcoming earnings dates, and news
 filtered to the symbols you actually hold.
@@ -168,6 +183,8 @@ to your app name and a contact email.
 | **Max Drawdown** | Largest peak-to-trough decline in the last year |
 | **Risk Score** | Composite 0–100 score from volatility, beta, and drawdown |
 | **R² vs SPY** | Share of daily moves that line up with the market; r² from the same fit as beta |
+| **Business quality** | Durable / Fair / Speculative / Pass from profit, FCF, margins, and leverage — used to re-rank scanner hits |
+| **Implied return** | Reverse DCF: fade conservative growth to 2.5% over 8 years and solve for the discount rate that matches today's EV or market cap |
 | **RSI** | Wilder's smoothing; returns neutral 50 on a flat series |
 | **Resistance** | Clustered local price highs from recent history |
 | **Breakout** | Price crossing resistance/support with volume confirmation |
@@ -176,7 +193,10 @@ Returns are logarithmic, beta is computed only over dates present in both the
 stock and benchmark series, and annualization uses 252 trading days. R² is the
 square of the Pearson correlation with SPY from that same regression — the
 share of daily moves the market actually explains. A high R² means beta is a
-useful description; a low R² means the name does not track the market.
+useful description; a low R² means the name does not track the market. The
+thesis tab's implied return is a reverse DCF: conservative growth faded to
+2.5%, solved for the discount rate that matches today's enterprise value (or
+market cap if earnings are used instead of free cash flow).
 
 ## Architecture Notes
 
@@ -215,10 +235,11 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-236 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+258 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation, R² and reliability of the SPY regression), technical indicators (RSI, ATR, moving averages, support and
 resistance), sell-reminder urgency (price hit, due date, approaching), 13F
-parse and quarter-over-quarter trades, cache
+parse, quarter-over-quarter trades, and the top-50 display cap, reverse DCF
+and business-quality grades used by the thesis tab, cache
 behavior including coalescing and stale-on-error, rate limit enforcement, the
 password gate, profile isolation and migration, market hours across weekends
 and both daylight and standard time, and both import parsers including the

@@ -9,6 +9,7 @@ import BreakoutScanner from "./BreakoutScanner";
 import CopyTrading from "./CopyTrading";
 import CorrelationHeatmap from "./CorrelationHeatmap";
 import HoldingsTable from "./HoldingsTable";
+import InvestmentThesis from "./InvestmentThesis";
 import PortfolioAllocation from "./PortfolioAllocation";
 import PortfolioInput from "./PortfolioInput";
 import PortfolioSummary from "./PortfolioSummary";
@@ -50,6 +51,11 @@ export default function Dashboard() {
   >(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [thesisRequest, setThesisRequest] = useState<{
+    symbol: string;
+    at: number;
+  } | null>(null);
 
   const autoAnalyzed = useRef(false);
 
@@ -121,6 +127,11 @@ export default function Dashboard() {
     setVisitedTabs((current) =>
       current.includes(tab) ? current : [...current, tab]
     );
+  }
+
+  function openThesis(symbol: string) {
+    setThesisRequest({ symbol, at: Date.now() });
+    handleTabChange("thesis");
   }
 
   function handleTargetChange(
@@ -261,15 +272,30 @@ export default function Dashboard() {
         </div>
       </TabPanel>
 
+      {visited("thesis") && (
+        <TabPanel active={activeTab === "thesis"}>
+          <InvestmentThesis
+            requestedSymbol={thesisRequest?.symbol}
+            requestedAt={thesisRequest?.at}
+          />
+        </TabPanel>
+      )}
+
       {visited("breakouts") && (
         <TabPanel active={activeTab === "breakouts"}>
-          <BreakoutScanner active={activeTab === "breakouts"} />
+          <BreakoutScanner
+            active={activeTab === "breakouts"}
+            onOpenThesis={openThesis}
+          />
         </TabPanel>
       )}
 
       {visited("picks") && (
         <TabPanel active={activeTab === "picks"}>
-          <BestStocksPicker active={activeTab === "picks"} />
+          <BestStocksPicker
+            active={activeTab === "picks"}
+            onOpenThesis={openThesis}
+          />
         </TabPanel>
       )}
 

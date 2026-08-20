@@ -99,6 +99,8 @@ export interface BreakoutCandidate {
   breakout: BreakoutSignal;
   marketState: string;
   lastUpdated: string;
+  /** How solid the underlying business looks, independent of the chart. */
+  businessQuality?: BusinessQuality;
 }
 
 export type TradeDirection = "long" | "short";
@@ -174,6 +176,8 @@ export interface DipCandidate {
   resistanceLevels: ResistanceLevel[];
   marketState: string;
   lastUpdated: string;
+  /** How solid the underlying business looks, independent of the chart. */
+  businessQuality?: BusinessQuality;
 }
 
 export interface MarketSearchResult {
@@ -313,6 +317,77 @@ export interface RegressionStats {
   betaCiHigh: number;
 }
 
+export type BusinessQualityGrade = "Durable" | "Fair" | "Speculative" | "Pass";
+
+/** Fundamental grade for the business, not the chart. */
+export interface BusinessQuality {
+  grade: BusinessQualityGrade;
+  summary: string;
+  flags: string[];
+  hardIndustry: boolean;
+}
+
+export type ThesisStance = "buy" | "wait" | "hold-study" | "pass";
+
+export type ThesisValuationMethod = "fcf" | "earnings" | "unavailable";
+
+export interface ThesisScreenFlag {
+  label: string;
+  tone: "good" | "warn" | "bad";
+}
+
+export interface ThesisPeer {
+  symbol: string;
+  name: string;
+  grade: BusinessQualityGrade | null;
+  note: string;
+}
+
+export interface InvestmentThesis {
+  symbol: string;
+  name: string;
+  currentPrice: number;
+  currency: string;
+  sector: string | null;
+  industry: string | null;
+  summary: string | null;
+  quality: BusinessQuality;
+  screen: {
+    kickOut: boolean;
+    kickOutReason: string | null;
+    flags: ThesisScreenFlag[];
+  };
+  createValue: string;
+  captureValue: string;
+  protectValue: string;
+  thesis: string;
+  bearCase: string[];
+  valuation: {
+    method: ThesisValuationMethod;
+    startingCashFlow: number | null;
+    conservativeGrowth: number | null;
+    impliedReturn: number | null;
+    hurdleRate: number;
+    sellRate: number;
+    riskFreeRate: number;
+    attractive: boolean;
+    buyPrice: number | null;
+    sellPrice: number | null;
+    forwardPe: number | null;
+    yearsToMarketMultiple: number | null;
+    explanation: string;
+  };
+  plan: {
+    stance: ThesisStance;
+    whenToBuy: string;
+    buyAt: number | null;
+    whenToSell: string;
+    sellAt: number | null;
+  };
+  peers: ThesisPeer[];
+  sources: string[];
+}
+
 export interface StockRiskMetrics {
   annualizedVolatility: number;
   beta: number;
@@ -445,6 +520,7 @@ export interface ThirteenFFilerReport {
   previousPeriod: ThirteenFPeriod | null;
   totalValueUsd: number;
   holdingCount: number;
+  tradeCount: number;
   holdings: ThirteenFHolding[];
   trades: ThirteenFTrade[];
   sourceUrl: string;

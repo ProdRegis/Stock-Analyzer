@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BookOpen,
   Briefcase,
   Landmark,
   Newspaper,
@@ -12,6 +13,7 @@ import {
 
 export type DashboardTab =
   | "portfolio"
+  | "thesis"
   | "breakouts"
   | "picks"
   | "stop-loss"
@@ -25,6 +27,7 @@ interface TabNavProps {
 
 const tabs: Array<{ id: DashboardTab; label: string; icon: LucideIcon }> = [
   { id: "portfolio", label: "Portfolio Analysis", icon: Briefcase },
+  { id: "thesis", label: "Investment Thesis", icon: BookOpen },
   { id: "breakouts", label: "Breakout Scanner", icon: TrendingUp },
   { id: "picks", label: "Dips & Shorts", icon: Sparkles },
   { id: "stop-loss", label: "Safety Stops", icon: ShieldAlert },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { matchNotableInvestors, padCik } from "./thirteen-f-filers";
 import {
+  presentThirteenFBook,
   diffThirteenFHoldings,
   holdingKey,
   parseThirteenFHoldings,
@@ -135,5 +136,40 @@ describe("diffThirteenFHoldings", () => {
     expect(trades.find((trade) => trade.putCall === "put")?.action).toBe(
       "exited"
     );
+  });
+});
+
+describe("presentThirteenFBook", () => {
+  it("keeps full counts while returning only the top slice", () => {
+    const holdings = Array.from({ length: 80 }, (_, index) => ({
+      issuer: `Name ${index}`,
+      titleOfClass: "COM",
+      cusip: String(index).padStart(9, "0"),
+      valueUsd: 80 - index,
+      shares: 1,
+      shareType: "SH",
+      putCall: null,
+      weight: 0,
+    }));
+    const trades = holdings.map((row) => ({
+      action: "opened" as const,
+      issuer: row.issuer,
+      cusip: row.cusip,
+      putCall: null,
+      sharesBefore: 0,
+      sharesAfter: 1,
+      valueUsdBefore: 0,
+      valueUsdAfter: row.valueUsd,
+      shareChange: 1,
+      valueChangeUsd: row.valueUsd,
+    }));
+
+    const presented = presentThirteenFBook(holdings, trades);
+
+    expect(presented.holdingCount).toBe(80);
+    expect(presented.tradeCount).toBe(80);
+    expect(presented.holdings).toHaveLength(50);
+    expect(presented.trades).toHaveLength(50);
+    expect(presented.holdings[0].issuer).toBe("Name 0");
   });
 });

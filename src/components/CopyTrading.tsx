@@ -269,8 +269,8 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
             )}
             <p className="mt-2 text-sm text-slate-400">
               {quarterLabel(report.period.reportDate)} holdings · filed{" "}
-              {report.period.filingDate} · {report.holdingCount} positions ·{" "}
-              {formatUsd(report.totalValueUsd)} reported long book
+              {report.period.filingDate} · {report.holdingCount.toLocaleString()}{" "}
+              positions · {formatUsd(report.totalValueUsd)} reported long book
             </p>
             <a
               href={report.sourceUrl}
@@ -300,7 +300,7 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
                 }`}
               >
                 {label}
-                {id === "trades" ? ` (${report.trades.length})` : ""}
+                {id === "trades" ? ` (${report.tradeCount})` : ""}
               </button>
             ))}
           </div>
@@ -346,6 +346,13 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
                   ))}
                 </tbody>
               </table>
+              {report.holdingCount > report.holdings.length && (
+                <p className="border-t border-slate-800 px-4 py-2.5 text-xs text-slate-500">
+                  Showing the {report.holdings.length} largest of{" "}
+                  {report.holdingCount.toLocaleString()} positions by reported
+                  value.
+                </p>
+              )}
             </div>
           ) : report.trades.length === 0 ? (
             <p className="px-5 py-8 text-sm text-slate-500">
@@ -405,6 +412,9 @@ export default function CopyTrading({ active = true }: { active?: boolean }) {
                   Compared with {quarterLabel(report.previousPeriod.reportDate)}{" "}
                   (filed {report.previousPeriod.filingDate}). Not the trade
                   dates.
+                  {report.tradeCount > report.trades.length
+                    ? ` Showing the ${report.trades.length} largest of ${report.tradeCount.toLocaleString()} share changes.`
+                    : ""}
                 </p>
               )}
             </div>

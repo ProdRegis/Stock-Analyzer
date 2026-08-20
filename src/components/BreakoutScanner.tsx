@@ -5,6 +5,7 @@ import { Radar } from "lucide-react";
 import DemoBadge from "./DemoBadge";
 import EmptyState from "./EmptyState";
 import PriceChart from "./PriceChart";
+import BusinessQualityBadge from "./BusinessQualityBadge";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
 import { formatMarketState } from "@/lib/format";
 import type { BreakoutCandidate, MarketSearchResult } from "@/lib/types";
@@ -45,7 +46,13 @@ function LiveValue({
   );
 }
 
-function CandidateCard({ candidate }: { candidate: BreakoutCandidate }) {
+function CandidateCard({
+  candidate,
+  onOpenThesis,
+}: {
+  candidate: BreakoutCandidate;
+  onOpenThesis?: (symbol: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -59,6 +66,16 @@ function CandidateCard({ candidate }: { candidate: BreakoutCandidate }) {
             <span className="rounded-full bg-blue-500/15 px-3 py-1 text-sm font-medium text-blue-300">
               <LiveValue value={`${candidate.likelihoodScore}% likelihood`} className="text-blue-300" />
             </span>
+            <BusinessQualityBadge quality={candidate.businessQuality} size="sm" />
+            {onOpenThesis && (
+              <button
+                type="button"
+                onClick={() => onOpenThesis(candidate.symbol)}
+                className="rounded-full border border-slate-700 px-2.5 py-1 text-xs font-medium text-blue-300 transition hover:border-blue-500/40 hover:text-blue-200"
+              >
+                Open thesis
+              </button>
+            )}
             <span className="rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-500">
               {formatMarketState(candidate.marketState)}
             </span>
@@ -235,8 +252,10 @@ function CandidateCard({ candidate }: { candidate: BreakoutCandidate }) {
 
 export default function BreakoutScanner({
   active = true,
+  onOpenThesis,
 }: {
   active?: boolean;
+  onOpenThesis?: (symbol: string) => void;
 }) {
   const [candidates, setCandidates] = useState<BreakoutCandidate[]>([]);
   const candidatesRef = useRef<BreakoutCandidate[]>([]);
@@ -393,7 +412,7 @@ export default function BreakoutScanner({
             <p className="mt-1 text-sm text-slate-500">
               {showingSample
                 ? "A shared sample scan, refreshed every few minutes. Search a stock or run your own scan for live results."
-                : "Run a full scan once, then prices, likelihood scores, and breakout distance update live every second."}
+                : "Run a full scan once, then prices, likelihood scores, and breakout distance update live every second. Durable businesses rank above similar chart setups that look speculative."}
             </p>
           </div>
           <div className="text-right text-xs text-slate-500">
@@ -471,7 +490,11 @@ export default function BreakoutScanner({
             Top Breakout Candidates ({candidates.length})
           </h3>
           {candidates.map((candidate) => (
-            <CandidateCard key={candidate.symbol} candidate={candidate} />
+            <CandidateCard
+              key={candidate.symbol}
+              candidate={candidate}
+              onOpenThesis={onOpenThesis}
+            />
           ))}
         </div>
       )}
