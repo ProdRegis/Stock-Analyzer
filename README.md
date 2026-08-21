@@ -37,9 +37,11 @@ still live on the Safety Stops tab.
 to kick the name out, how the business creates / captures / protects value, a
 plain-vanilla thesis, the main ways it can be wrong, and a reverse DCF that
 solves for the return already priced in — including the year-by-year cash-flow
-table and a few growth haircuts, not just the punchline. Buy and sell prices
-are the levels where that implied return clears a Treasury-plus-8% hurdle or
-sags to Treasury-plus-4%. Loss-making or highly leveraged names are labeled
+table and a few growth haircuts, not just the punchline. The buy and sell
+boxes are nearby chart levels (support a couple percent below the live
+print, resistance a bit above). The reverse DCF still shows implied return
+and the cash-flow “cheap / fully priced” model prices in Tied to numbers —
+those are not tickets. Loss-making or highly leveraged names are labeled
 Pass instead of inventing a buy price. Related names come from Yahoo's peer
 list. Concentrated 13F stock-pickers who hold the name are listed when that
 data is already in cache. Recent theses stay in this browser. **Thesis** on a

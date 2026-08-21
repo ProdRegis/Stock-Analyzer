@@ -5,6 +5,7 @@ import {
   fetchFundamentals,
   type CompanyFundamentals,
 } from "./fundamentals";
+import { fetchDailyHistory } from "./market-data";
 import { fetchRiskFreeRate } from "./market-rates";
 import {
   cappedReportedGrowth,
@@ -14,6 +15,7 @@ import {
   impliedReturn,
   valueAtDiscountRate,
 } from "./reverse-dcf";
+import { findResistanceLevels, findSupportLevels } from "./technical";
 import { notableHoldersForSymbol } from "./thirteen-f";
 import { yahooFinance } from "./yahoo-client";
 import type {
@@ -31,6 +33,15 @@ const TERMINAL_GROWTH = 0.025;
 const FORECAST_YEARS = 8;
 const MARKET_FORWARD_PE = 22;
 
+/** Add on a dip, not a crash: 1–8% below the live print. */
+const TAPE_BUY_MIN_GAP = 0.01;
+const TAPE_BUY_MAX_GAP = 0.08;
+const TAPE_BUY_FALLBACK = 0.02;
+/** Trim into strength: 2–15% above the live print. */
+const TAPE_SELL_MIN_GAP = 0.02;
+const TAPE_SELL_MAX_GAP = 0.15;
+const TAPE_SELL_FALLBACK = 0.12;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -46,6 +57,49 @@ function money(value: number): string {
   if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(1)}B`;
   if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(0)}M`;
   return `${sign}$${abs.toFixed(0)}`;
+}
+
+function dollars(value: number): string {
+  return `$${value.toFixed(2)}`;
+}
+
+function roundTapePrice(price: number): number {
+  const step = price >= 100 ? 0.5 : price >= 20 ? 0.25 : 0.05;
+  return Number((Math.round(price / step) * step).toFixed(2));
+}
+
+export function nearbyTapeBuy(
+  current: number,
+  supports: Array<{ price: number }>
+): { price: number; source: "support" | "buffer" } | null {
+  if (!(current > 0)) return null;
+  const floor = current * (1 - TAPE_BUY_MAX_GAP);
+  const ceil = current * (1 - TAPE_BUY_MIN_GAP);
+  const hit = supports
+    .map((level) => level.price)
+    .filter((price) => Number.isFinite(price) && price >= floor && price <= ceil)
+    .sort((a, b) => b - a)[0];
+  const raw = hit ?? current * (1 - TAPE_BUY_FALLBACK);
+  const price = roundTapePrice(raw);
+  if (!(price > 0) || price >= current) return null;
+  return { price, source: hit != null ? "support" : "buffer" };
+}
+
+export function nearbyTapeSell(
+  current: number,
+  resistances: Array<{ price: number }>
+): { price: number; source: "resistance" | "buffer" } | null {
+  if (!(current > 0)) return null;
+  const floor = current * (1 + TAPE_SELL_MIN_GAP);
+  const ceil = current * (1 + TAPE_SELL_MAX_GAP);
+  const hit = resistances
+    .map((level) => level.price)
+    .filter((price) => Number.isFinite(price) && price >= floor && price <= ceil)
+    .sort((a, b) => a - b)[0];
+  const raw = hit ?? current * (1 + TAPE_SELL_FALLBACK);
+  const price = roundTapePrice(raw);
+  if (!(price > current)) return null;
+  return { price, source: hit != null ? "resistance" : "buffer" };
 }
 
 function firstSentences(text: string | null, count: number): string | null {
@@ -284,6 +338,8 @@ export interface ThesisBuildInput {
   riskFreeRate: number;
   peers: ThesisPeer[];
   notableHolders?: NotableHolder[];
+  supportLevels?: Array<{ price: number }>;
+  resistanceLevels?: Array<{ price: number }>;
 }
 
 function scenarioForGrowth(
@@ -387,27 +443,45 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
     stance = "pass";
   }
 
+  const tapeBuy = nearbyTapeBuy(
+    fundamentals.currentPrice,
+    input.supportLevels ?? []
+  );
+  const tapeSell = nearbyTapeSell(
+    fundamentals.currentPrice,
+    input.resistanceLevels ?? []
+  );
+
+  const showTape = stance === "buy" || stance === "wait";
   const planBuyAt =
     stance === "buy"
       ? fundamentals.currentPrice
       : stance === "wait"
-        ? buyPrice
+        ? (tapeBuy?.price ?? null)
         : null;
+  const planSellAt = showTape ? (tapeSell?.price ?? null) : null;
+  const buySource =
+    stance === "buy" ? "now" : stance === "wait" ? (tapeBuy?.source ?? null) : null;
+  const sellSource = showTape ? (tapeSell?.source ?? null) : null;
 
   const whenToBuy =
     stance === "buy"
       ? `Now — conservative cash flows already imply about ${pct(implied ?? 0, 1)} a year, above the ${pct(hurdleRate, 1)} hurdle. You do not need a clever catalyst.`
       : stance === "wait"
-        ? `Not at this price. Wait for about ${buyPrice != null ? `$${buyPrice.toFixed(2)}` : "a lower print"}, where the same cash-flow assumptions clear the ${pct(hurdleRate, 1)} hurdle.`
+        ? `Don't chase ${dollars(fundamentals.currentPrice)}. A closer add is nearby support around ${planBuyAt != null ? dollars(planBuyAt) : "a small dip"}. Cash flows at this price only imply ${implied != null ? `${pct(implied, 1)} a year` : "a thin return"}, so the stance is wait — that is not ${buyPrice != null ? `a ${dollars(buyPrice)} order` : "the cash-flow model price"}.`
         : stance === "hold-study"
           ? "Do not start a position from this screen. Keep a file on the business so you know what a great company looks like if it ever sells off."
           : screen.kickOutReason ??
             "Pass. Spend the time on a business you can actually underwrite.";
 
   const whenToSell =
-    method === "unavailable"
-      ? "There is no cash-flow sell price yet. Exit if you cannot explain create / capture / protect in a paragraph, or if a bear-case item below starts looking true."
-      : `This is a hold, not a five-day trade. Trim or sell when the price implies only a ${pct(sellRate, 1)} return${sellPrice != null ? ` (around $${sellPrice.toFixed(2)})` : ""}, or sooner if a bear-case thread starts looking true. Do not invent a more specific story just to feel smart — extra detail is extra ways to be wrong.`;
+    !showTape
+      ? method === "unavailable"
+        ? "There is no cash-flow sell price yet. Exit if you cannot explain create / capture / protect in a paragraph, or if a bear-case item below starts looking true."
+        : "Pass. Do not invent a trim ticket for a name you should not own."
+      : planSellAt != null
+        ? `If you already hold it, trim near resistance around ${dollars(planSellAt)}. That is a chart level next to the live print, not the cash-flow model's ${sellPrice != null ? dollars(sellPrice) : "fully-priced figure"}. Exit sooner if a bear-case thread starts looking true.`
+        : "If you already hold it, trim into strength on the chart. Exit sooner if a bear-case thread starts looking true.";
 
   const explanation =
     method === "unavailable"
@@ -511,7 +585,9 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
       whenToBuy,
       buyAt: planBuyAt,
       whenToSell,
-      sellAt: sellPrice,
+      sellAt: planSellAt,
+      buySource,
+      sellSource,
     },
     peers,
     notableHolders: input.notableHolders ?? [],
@@ -519,6 +595,7 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
       "Yahoo Finance quoteSummary (profile, financials, key statistics)",
       "Reverse DCF of trailing FCF or earnings, growth haircut 30%, fade to 2.5%",
       "Live Treasury yield for the hurdle (rf + 8%) and sell rate (rf + 4%)",
+      "Daily chart support and resistance for nearby add/trim prices",
       "Yahoo recommendationsBySymbol for industry peers; concentrated 13F books for who else holds it",
     ],
   };
@@ -593,11 +670,12 @@ export async function generateInvestmentThesis(
 ): Promise<InvestmentThesis> {
   const upper = symbol.trim().toUpperCase();
 
-  return cached(`thesis:${upper}`, TTL.quoteSummary, async () => {
-    const [fundamentals, rateInfo, notableHolders] = await Promise.all([
+  return cached(`thesis:v2:${upper}`, TTL.quoteSummary, async () => {
+    const [fundamentals, rateInfo, notableHolders, history] = await Promise.all([
       fetchFundamentals(upper),
       fetchRiskFreeRate(),
       notableHoldersForSymbol(upper),
+      fetchDailyHistory(upper).catch(() => []),
     ]);
 
     if (!fundamentals.currentPrice) {
@@ -613,6 +691,8 @@ export async function generateInvestmentThesis(
       riskFreeRate: rateInfo.rate,
       peers,
       notableHolders,
+      supportLevels: history.length ? findSupportLevels(history) : [],
+      resistanceLevels: history.length ? findResistanceLevels(history) : [],
     });
   });
 }

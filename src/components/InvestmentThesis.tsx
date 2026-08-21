@@ -174,7 +174,15 @@ function ThesisReport({
               ? formatCurrency(thesis.plan.buyAt)
               : "—"}
           </p>
-          <p className="text-xs text-slate-500">Buy at</p>
+          <p className="text-xs text-slate-500">
+            {thesis.plan.buySource === "now"
+              ? "Buy at the live price"
+              : thesis.plan.buySource === "support"
+                ? "Add near support"
+                : thesis.plan.buySource === "buffer"
+                  ? "Add on a small dip"
+                  : "Buy at"}
+          </p>
         </div>
         <div className="rounded-2xl border border-orange-500/25 bg-orange-500/10 p-4">
           <p className="text-xs font-medium uppercase tracking-wide text-orange-400">
@@ -188,7 +196,13 @@ function ThesisReport({
               ? formatCurrency(thesis.plan.sellAt)
               : "—"}
           </p>
-          <p className="text-xs text-slate-500">Sell / trim at</p>
+          <p className="text-xs text-slate-500">
+            {thesis.plan.sellSource === "resistance"
+              ? "Trim near resistance"
+              : thesis.plan.sellSource === "buffer"
+                ? "Trim into strength"
+                : "Sell / trim at"}
+          </p>
         </div>
       </section>
 
@@ -243,6 +257,28 @@ function ThesisReport({
                   : "None usable"}
             </p>
           </div>
+          {thesis.valuation.buyPrice != null && (
+            <div className="rounded-xl bg-slate-800/60 px-3 py-2.5">
+              <p className="text-xs text-slate-500">Cash-flow cheap</p>
+              <p className="mt-0.5 text-lg font-semibold tabular-nums text-white">
+                {formatCurrency(thesis.valuation.buyPrice)}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Model price at the hurdle — not a ticket
+              </p>
+            </div>
+          )}
+          {thesis.valuation.sellPrice != null && (
+            <div className="rounded-xl bg-slate-800/60 px-3 py-2.5">
+              <p className="text-xs text-slate-500">Cash-flow fully priced</p>
+              <p className="mt-0.5 text-lg font-semibold tabular-nums text-white">
+                {formatCurrency(thesis.valuation.sellPrice)}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Model price at a 4% extra return
+              </p>
+            </div>
+          )}
         </div>
         <p className="mt-4 text-xs leading-relaxed text-slate-500">
           {thesis.valuation.explanation}
@@ -271,7 +307,7 @@ function ThesisReport({
                     ? formatPct(row.impliedReturn)
                     : "—"}
                   {row.buyPrice != null
-                    ? ` · buy ${formatCurrency(row.buyPrice)}`
+                    ? ` · model ${formatCurrency(row.buyPrice)}`
                     : ""}
                 </p>
               </div>
@@ -528,8 +564,9 @@ export default function InvestmentThesis({
           Search a stock. The write-up follows a research process used by
           professional analysts: kick out what you cannot underwrite, ask how
           the business creates, captures, and protects value, then tie a simple
-          thesis to a reverse DCF — buy when conservative cash flows already
-          imply a high return, sell when the price no longer does.
+          thesis to a reverse DCF. The buy and sell boxes are nearby chart
+          levels around the live print. Cash-flow cheap vs expensive stays in
+          Tied to numbers — those are not tickets.
         </p>
 
         <form

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { scoreBusinessQuality } from "./business-quality";
 import type { CompanyFundamentals } from "./fundamentals";
-import { buildInvestmentThesis } from "./investment-thesis";
+import {
+  buildInvestmentThesis,
+  nearbyTapeBuy,
+  nearbyTapeSell,
+} from "./investment-thesis";
 
 function base(over: Partial<CompanyFundamentals> = {}): CompanyFundamentals {
   return {
@@ -64,7 +68,10 @@ describe("buildInvestmentThesis", () => {
     );
     expect(thesis.plan.stance).toBe("buy");
     expect(thesis.plan.buyAt).toBe(12);
+    expect(thesis.plan.buySource).toBe("now");
     expect(thesis.plan.sellAt).not.toBeNull();
+    expect(thesis.plan.sellAt!).toBeGreaterThan(12);
+    expect(thesis.plan.sellAt!).toBeLessThan(15);
     expect(thesis.plan.whenToBuy.toLowerCase()).toContain("now");
   });
 
@@ -80,13 +87,40 @@ describe("buildInvestmentThesis", () => {
       quality: scoreBusinessQuality(fundamentals),
       riskFreeRate: 0.043,
       peers: [],
+      supportLevels: [{ price: 196 }],
+      resistanceLevels: [{ price: 224 }],
     });
 
     expect(thesis.plan.stance).toBe("wait");
-    expect(thesis.plan.buyAt).not.toBeNull();
-    expect(thesis.plan.buyAt!).toBeLessThan(200);
+    expect(thesis.plan.buyAt).toBe(196);
+    expect(thesis.plan.sellAt).toBe(224);
+    expect(thesis.plan.buySource).toBe("support");
+    expect(thesis.plan.sellSource).toBe("resistance");
+    expect(thesis.valuation.buyPrice).not.toBeNull();
+    expect(thesis.valuation.buyPrice!).toBeLessThan(50);
     expect(thesis.createValue.toLowerCase()).toContain("customer");
     expect(thesis.bearCase.length).toBeGreaterThan(0);
+  });
+
+  it("falls back to a small dip and a modest trim when the chart is empty", () => {
+    const fundamentals = base({
+      currentPrice: 103.5,
+      marketCap: 280_000_000_000,
+      enterpriseValue: 280_000_000_000,
+      freeCashflow: 1_500_000_000,
+    });
+    const thesis = buildInvestmentThesis({
+      fundamentals,
+      quality: scoreBusinessQuality(fundamentals),
+      riskFreeRate: 0.043,
+      peers: [],
+    });
+
+    expect(thesis.plan.stance).toBe("wait");
+    expect(thesis.plan.buyAt).toBe(101.5);
+    expect(thesis.plan.sellAt).toBe(116);
+    expect(thesis.plan.buySource).toBe("buffer");
+    expect(thesis.plan.sellSource).toBe("buffer");
   });
 
   it("passes unprofitable biotech instead of inventing a buy price", () => {
@@ -110,6 +144,7 @@ describe("buildInvestmentThesis", () => {
 
     expect(thesis.plan.stance).toBe("pass");
     expect(thesis.plan.buyAt).toBeNull();
+    expect(thesis.plan.sellAt).toBeNull();
     expect(thesis.quality.hardIndustry).toBe(true);
     expect(thesis.valuation.method).toBe("unavailable");
   });
@@ -131,5 +166,26 @@ describe("buildInvestmentThesis", () => {
     expect(thesis.createValue.toLowerCase()).toContain("10-k");
     expect(thesis.captureValue.toLowerCase()).toContain("snapshot");
     expect(thesis.valuation.scenarios.length).toBeGreaterThan(0);
+  });
+});
+
+describe("nearbyTapeBuy / nearbyTapeSell", () => {
+  it("uses nearby support and resistance when they sit next to the tape", () => {
+    const buy = nearbyTapeBuy(103.5, [{ price: 101.5 }, { price: 88 }]);
+    const sell = nearbyTapeSell(103.5, [{ price: 115.7 }, { price: 140 }]);
+
+    expect(buy).toEqual({ price: 101.5, source: "support" });
+    expect(sell).toEqual({ price: 115.5, source: "resistance" });
+  });
+
+  it("falls back to a 2% dip and a 12% trim", () => {
+    expect(nearbyTapeBuy(103.5, [])).toEqual({
+      price: 101.5,
+      source: "buffer",
+    });
+    expect(nearbyTapeSell(103.5, [])).toEqual({
+      price: 116,
+      source: "buffer",
+    });
   });
 });

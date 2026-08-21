@@ -408,6 +408,10 @@ export interface InvestmentThesis {
     buyAt: number | null;
     whenToSell: string;
     sellAt: number | null;
+    /** Live print, nearby support, or a small dip buffer. */
+    buySource: "now" | "support" | "buffer" | null;
+    /** Nearby resistance, or a modest buffer above the tape. */
+    sellSource: "resistance" | "buffer" | null;
   };
   peers: ThesisPeer[];
   notableHolders: NotableHolder[];
