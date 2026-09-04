@@ -44,8 +44,10 @@ and the cash-flow “cheap / fully priced” model prices in Tied to numbers —
 those are not tickets. Loss-making or highly leveraged names are labeled
 Pass instead of inventing a buy price. Related names come from Yahoo's peer
 list. Concentrated 13F stock-pickers who hold the name are listed when that
-data is already in cache. Recent theses stay in this browser. **Thesis** on a
-holding, stop, headline, or 13F row jumps here.
+data is already in cache. Each write-up ends with links to the 10-K, IR site,
+and recent earnings — the snapshot is not a substitute for those. Recent
+theses stay in this browser. **Thesis** on a holding, stop, headline, or 13F
+row jumps here.
 
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
 resistance and how past breakouts resolved, then lifts durable businesses
@@ -80,8 +82,14 @@ outside the top 50. Last manager is remembered. Names without a parseable 13F
 are not included. Huge books still show the top 50 by default so a Citadel
 filing does not dump thousands of rows.
 
-**News & Events** — High-impact headlines, upcoming earnings dates, and news
-filtered to the symbols you actually hold.
+**News & Events** — High-impact headlines, upcoming earnings and dividends on
+your holdings and large caps, and news filtered to the symbols you actually
+hold. Each upcoming print shows a projected EPS (consensus plus this name's
+historical surprise, shrunk), a Student-t chance of beating that consensus, and
+a buy / short / wait call for *when* — before the print only when the beat
+history and post-print drift are both identified. Dividends show a quarterly
+run-rate and a pay/maintain chance from payout and cash-flow coverage; chasing
+the ex-date is not treated as an edge.
 
 Across all tabs: portfolios are saved in the browser and restored on return,
 charts plot your cost basis, and the header shows live market status alongside a
@@ -195,6 +203,7 @@ already confirmed works against `data.sec.gov`.
 | **R² vs SPY** | Share of daily moves that line up with the market; r² from the same fit as beta |
 | **Business quality** | Durable / Fair / Speculative / Pass from profit, FCF, margins, and leverage — used to re-rank scanner hits |
 | **Implied return** | Reverse DCF: fade conservative growth to 2.5% over 8 years and solve for the discount rate that matches today's EV or market cap |
+| **Event hit chance** | Student-t predictive from this name's EPS surprises (shrunk toward a 67% market prior), or dividend coverage from payout / FCF |
 | **RSI** | Wilder's smoothing; returns neutral 50 on a flat series |
 | **Resistance** | Clustered local price highs from recent history |
 | **Breakout** | Price crossing resistance/support with volume confirmation |
@@ -249,7 +258,8 @@ npm test
 correlation, R² and reliability of the SPY regression), technical indicators (RSI, ATR, moving averages, support and
 resistance), sell-reminder urgency (price hit, due date, approaching), 13F
 parse, quarter-over-quarter trades, and the top-50 display cap, reverse DCF
-and business-quality grades used by the thesis tab, cache
+and business-quality grades used by the thesis tab, event hit chances
+(Student-t predictive surprises, dividend coverage, buy/short stance), cache
 behavior including coalescing and stale-on-error, rate limit enforcement, the
 password gate, profile isolation and migration, market hours across weekends
 and both daylight and standard time, and both import parsers including the

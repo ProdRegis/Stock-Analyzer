@@ -212,6 +212,8 @@ export interface MarketCompanyDetails {
   intradayHistory: PricePoint[];
 }
 
+export type BusinessQualityGrade = "Durable" | "Fair" | "Speculative" | "Pass";
+
 export interface UpcomingMarketEvent {
   symbol: string;
   name: string;
@@ -222,6 +224,64 @@ export interface UpcomingMarketEvent {
     high?: number;
     avg?: number;
   };
+  forecast?: EventForecast;
+}
+
+export type EventTradeStance =
+  | "buy"
+  | "short"
+  | "wait"
+  | "hold-through"
+  | "skip";
+
+export interface EarningsSurprise {
+  period: string;
+  quarter: string | null;
+  epsActual: number | null;
+  epsEstimate: number | null;
+  surprisePercent: number | null;
+  nextDayReturn: number | null;
+}
+
+export interface EventProjection {
+  label: string;
+  consensus: number | null;
+  low: number | null;
+  high: number | null;
+  ourEstimate: number | null;
+  unit: "eps" | "usd";
+  revenueAvg: number | null;
+  revenueLow: number | null;
+  revenueHigh: number | null;
+  yearAgoEps: number | null;
+  analystCount: number | null;
+  quarterlyDividend: number | null;
+  yield: number | null;
+}
+
+export interface EventForecast {
+  kind: "earnings" | "dividend";
+  projected: EventProjection;
+  /** 0–1 chance of beating consensus EPS, or of paying/maintaining the dividend. */
+  hitChance: number;
+  missChance: number;
+  /** 0–1 chance the print lands inside the analyst low–high range. */
+  rangeHitChance: number | null;
+  confidence: "High" | "Medium" | "Low";
+  calculation: string;
+  history: EarningsSurprise[];
+  sampleSize: number;
+  expectedMovePercent: number | null;
+  avgBeatMovePercent: number | null;
+  avgMissMovePercent: number | null;
+  trade: {
+    stance: EventTradeStance;
+    direction: "long" | "short" | "none";
+    when: string;
+    whenWindow: "before_event" | "after_event" | "hold" | "avoid";
+    summary: string;
+  };
+  qualityGrade: BusinessQualityGrade | null;
 }
 
 export interface StockImpactAnalysis {
@@ -317,8 +377,6 @@ export interface RegressionStats {
   betaCiHigh: number;
 }
 
-export type BusinessQualityGrade = "Durable" | "Fair" | "Speculative" | "Pass";
-
 /** Fundamental grade for the business, not the chart. */
 export interface BusinessQuality {
   grade: BusinessQualityGrade;
@@ -363,6 +421,13 @@ export interface NotableHolder {
   filerName: string;
   cik: string;
   weight: number;
+}
+
+/** A primary source to open after the snapshot, not a model input. */
+export interface ThesisReadingLink {
+  label: string;
+  href: string;
+  detail: string;
 }
 
 export interface InvestmentThesis {
@@ -415,6 +480,8 @@ export interface InvestmentThesis {
   };
   peers: ThesisPeer[];
   notableHolders: NotableHolder[];
+  website: string | null;
+  readingNext: ThesisReadingLink[];
   sources: string[];
 }
 

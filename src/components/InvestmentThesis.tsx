@@ -401,6 +401,36 @@ function ThesisReport({
         </ol>
       </section>
 
+      {thesis.readingNext.length > 0 && (
+        <section className="surface-2 rounded-2xl p-5">
+          <h3 className="text-sm font-medium text-slate-200">
+            Where to read next
+          </h3>
+          <p className="mt-1 text-xs text-slate-500">
+            This page is a filings snapshot plus a reverse DCF. The 10-K, IR
+            deck, and last year of transcripts are where you find out whether a
+            fact even exists — then whether it kills the thesis.
+          </p>
+          <ul className="mt-3 space-y-3">
+            {thesis.readingNext.map((link) => (
+              <li key={link.href}>
+                <a
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm font-medium text-blue-300 transition hover:text-blue-200"
+                >
+                  {link.label}
+                </a>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                  {link.detail}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {thesis.peers.length > 0 && (
         <section className="surface-2 rounded-2xl p-5">
           <h3 className="text-sm font-medium text-slate-200">
@@ -561,12 +591,12 @@ export default function InvestmentThesis({
       <section className="surface-2 rounded-2xl p-5">
         <h2 className="text-lg font-semibold text-white">Investment Thesis</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Search a stock. The write-up follows a research process used by
-          professional analysts: kick out what you cannot underwrite, ask how
-          the business creates, captures, and protects value, then tie a simple
-          thesis to a reverse DCF. The buy and sell boxes are nearby chart
-          levels around the live print. Cash-flow cheap vs expensive stays in
-          Tied to numbers — those are not tickets.
+          Search a stock. The write-up follows a four-part research process:
+          pick something you can actually understand, ask how it creates /
+          captures / protects value, write a plain-vanilla thesis tied to a
+          reverse DCF, then go read the 10-K. The buy and sell boxes are nearby
+          chart levels around the live print. Cash-flow cheap vs expensive
+          stays in Tied to numbers — those are not tickets.
         </p>
 
         <form
@@ -633,7 +663,7 @@ export default function InvestmentThesis({
           <EmptyState
             icon={BookOpen}
             title="No thesis yet"
-            description="Pick a company you think you understand. The goal is a plain-vanilla write-up you could defend, not a clever one-off trade."
+            description="Start with a product you actually use, a name from Copy Trading, or a durable dip on Dips & Shorts. Kick out anything you cannot explain. The goal is a write-up you could defend, not a clever one-off trade."
           />
         </div>
       )}

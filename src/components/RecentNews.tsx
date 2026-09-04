@@ -5,8 +5,16 @@ import { Newspaper } from "lucide-react";
 import EmptyState from "./EmptyState";
 import OpenThesisButton from "./OpenThesisButton";
 import PriceChart from "./PriceChart";
+import BusinessQualityBadge from "./BusinessQualityBadge";
 import { useStockAnalysis } from "@/hooks/useStockAnalysis";
-import type { NewsArticle, NewsFeed, StockImpactAnalysis, UpcomingMarketEvent } from "@/lib/types";
+import type {
+  EventForecast,
+  EventTradeStance,
+  NewsArticle,
+  NewsFeed,
+  StockImpactAnalysis,
+  UpcomingMarketEvent,
+} from "@/lib/types";
 import { getAffectedSymbols } from "@/lib/news-impact";
 
 interface RecentNewsProps {
@@ -55,6 +63,217 @@ function eventLabel(event: UpcomingMarketEvent) {
   return "Ex-Dividend Date";
 }
 
+function formatEps(value: number) {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  return `${sign}$${abs.toFixed(abs >= 10 ? 2 : 3)}`;
+}
+
+function formatCompact(value: number) {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "−" : "";
+  if (abs >= 1e12) return `${sign}$${(abs / 1e12).toFixed(1)}T`;
+  if (abs >= 1e9) return `${sign}$${(abs / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6) return `${sign}$${(abs / 1e6).toFixed(0)}M`;
+  return `${sign}$${abs.toFixed(2)}`;
+}
+
+const stanceCopy: Record<
+  EventTradeStance,
+  { label: string; className: string }
+> = {
+  buy: {
+    label: "Buy",
+    className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+  },
+  short: {
+    label: "Short",
+    className: "border-red-500/30 bg-red-500/10 text-red-200",
+  },
+  wait: {
+    label: "Wait",
+    className: "border-amber-500/30 bg-amber-500/10 text-amber-100",
+  },
+  "hold-through": {
+    label: "Hold through",
+    className: "border-blue-500/30 bg-blue-500/10 text-blue-200",
+  },
+  skip: {
+    label: "Skip",
+    className: "border-slate-600/60 bg-slate-800/60 text-slate-200",
+  },
+};
+
+function EventForecastBody({
+  forecast,
+  eventType,
+}: {
+  forecast: EventForecast;
+  eventType: UpcomingMarketEvent["type"];
+}) {
+  const [showMath, setShowMath] = useState(false);
+  const stance = stanceCopy[forecast.trade.stance];
+  const hitPct = Math.round(forecast.hitChance * 100);
+  const missPct = Math.round(forecast.missChance * 100);
+  const projected = forecast.projected.ourEstimate ?? forecast.projected.consensus;
+  const isEps = forecast.kind === "earnings";
+
+  return (
+    <div className="mt-3 space-y-3">
+      {eventType === "earnings_call" && (
+        <p className="text-xs text-slate-500">
+          The call is Q&amp;A. The trade, if there is one, is the print.
+        </p>
+      )}
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-lg bg-slate-800/60 px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">
+            Projected {forecast.projected.label}
+          </p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums text-white">
+            {projected != null
+              ? isEps
+                ? formatEps(projected)
+                : formatCompact(projected)
+              : "—"}
+          </p>
+          {forecast.projected.consensus != null &&
+            forecast.projected.ourEstimate != null &&
+            isEps && (
+              <p className="text-[11px] text-slate-500">
+                Consensus {formatEps(forecast.projected.consensus)}
+                {forecast.projected.low != null &&
+                  forecast.projected.high != null &&
+                  ` · range ${formatEps(forecast.projected.low)}–${formatEps(forecast.projected.high)}`}
+              </p>
+            )}
+          {forecast.kind === "dividend" && forecast.projected.yield != null && (
+            <p className="text-[11px] text-slate-500">
+              Yield {(forecast.projected.yield * 100).toFixed(1)}% annualized
+            </p>
+          )}
+        </div>
+        <div className="rounded-lg bg-slate-800/60 px-3 py-2">
+          <p className="text-[11px] uppercase tracking-wide text-slate-500">
+            {isEps ? "Chance of beating consensus" : "Chance they pay it"}
+          </p>
+          <p className="mt-0.5 text-lg font-semibold tabular-nums text-emerald-300">
+            {hitPct}%
+          </p>
+          <p className="text-[11px] text-slate-500">
+            {missPct}% {isEps ? "miss" : "cut / skip"} · {forecast.confidence}{" "}
+            confidence
+            {forecast.sampleSize > 0 ? ` · n=${forecast.sampleSize}` : ""}
+            {forecast.expectedMovePercent != null
+              ? ` · typical print ±${(Math.abs(forecast.expectedMovePercent) * 100).toFixed(1)}%`
+              : ""}
+          </p>
+        </div>
+        <div className={`rounded-lg border px-3 py-2 ${stance.className}`}>
+          <p className="text-[11px] uppercase tracking-wide opacity-80">
+            {stance.label}
+          </p>
+          <p className="mt-0.5 text-sm font-medium">{forecast.trade.when}</p>
+        </div>
+      </div>
+
+      {forecast.projected.revenueAvg != null && (
+        <p className="text-xs text-slate-500">
+          Revenue estimate {formatCompact(forecast.projected.revenueAvg)}
+          {forecast.projected.revenueLow != null &&
+            forecast.projected.revenueHigh != null &&
+            ` (range ${formatCompact(forecast.projected.revenueLow)}–${formatCompact(forecast.projected.revenueHigh)})`}
+          {forecast.rangeHitChance != null &&
+            ` · ${Math.round(forecast.rangeHitChance * 100)}% chance EPS lands in the analyst range`}
+        </p>
+      )}
+
+      <p className="text-sm leading-relaxed text-slate-300">
+        {forecast.trade.summary}
+      </p>
+
+      <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+        <div
+          className="h-full rounded-full bg-emerald-500"
+          style={{ width: `${hitPct}%` }}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowMath((value) => !value)}
+        className="text-xs font-medium text-blue-300 transition hover:text-blue-200"
+      >
+        {showMath ? "Hide the math" : "How this was calculated"}
+      </button>
+
+      {showMath && (
+        <div className="space-y-3">
+          <p className="text-xs leading-relaxed text-slate-500">
+            {forecast.calculation}
+          </p>
+          {forecast.history.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[22rem] text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wide text-slate-500">
+                    <th className="py-1.5 pr-3 font-medium">Period</th>
+                    <th className="py-1.5 pr-3 text-right font-medium">Est.</th>
+                    <th className="py-1.5 pr-3 text-right font-medium">Actual</th>
+                    <th className="py-1.5 pr-3 text-right font-medium">Surprise</th>
+                    <th className="py-1.5 text-right font-medium">Print day</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {forecast.history.slice(0, 8).map((row) => (
+                    <tr
+                      key={`${row.period}-${row.quarter ?? ""}`}
+                      className="border-b border-slate-800/70"
+                    >
+                      <td className="py-1.5 pr-3 text-slate-400">
+                        {row.period}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums text-slate-300">
+                        {row.epsEstimate != null ? formatEps(row.epsEstimate) : "—"}
+                      </td>
+                      <td className="py-1.5 pr-3 text-right tabular-nums text-white">
+                        {row.epsActual != null ? formatEps(row.epsActual) : "—"}
+                      </td>
+                      <td
+                        className={`py-1.5 pr-3 text-right tabular-nums ${
+                          (row.surprisePercent ?? 0) >= 0
+                            ? "text-emerald-300"
+                            : "text-red-300"
+                        }`}
+                      >
+                        {row.surprisePercent != null
+                          ? `${row.surprisePercent >= 0 ? "+" : ""}${(row.surprisePercent * 100).toFixed(1)}%`
+                          : "—"}
+                      </td>
+                      <td
+                        className={`py-1.5 text-right tabular-nums ${
+                          (row.nextDayReturn ?? 0) >= 0
+                            ? "text-emerald-300"
+                            : "text-red-300"
+                        }`}
+                      >
+                        {row.nextDayReturn != null
+                          ? `${row.nextDayReturn >= 0 ? "+" : ""}${(row.nextDayReturn * 100).toFixed(1)}%`
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function EventCard({
   event,
   onOpenThesis,
@@ -62,11 +281,21 @@ function EventCard({
   event: UpcomingMarketEvent;
   onOpenThesis?: (symbol: string) => void;
 }) {
+  const quality =
+    event.forecast?.qualityGrade != null
+      ? {
+          grade: event.forecast.qualityGrade,
+          summary: "",
+          flags: [],
+          hardIndustry: false,
+        }
+      : undefined;
+
   return (
     <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-4 py-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-white">{event.symbol}</span>
             {onOpenThesis && (
               <OpenThesisButton symbol={event.symbol} onOpen={onOpenThesis} />
@@ -74,6 +303,7 @@ function EventCard({
             <span className="rounded-md bg-violet-500/5 px-2 py-0.5 text-xs text-violet-300">
               {eventLabel(event)}
             </span>
+            {quality && <BusinessQualityBadge quality={quality} size="sm" />}
           </div>
           <p className="text-sm text-slate-500">{event.name}</p>
         </div>
@@ -81,14 +311,16 @@ function EventCard({
           {formatEventDate(event.date)}
         </p>
       </div>
-      {event.earningsEstimate?.avg != null && (
+      {event.forecast ? (
+        <EventForecastBody forecast={event.forecast} eventType={event.type} />
+      ) : event.earningsEstimate?.avg != null ? (
         <p className="mt-2 text-xs text-slate-500">
-          EPS estimate: ${event.earningsEstimate.avg.toFixed(2)}
+          EPS estimate: {formatEps(event.earningsEstimate.avg)}
           {event.earningsEstimate.low != null &&
             event.earningsEstimate.high != null &&
-            ` (range $${event.earningsEstimate.low.toFixed(2)}–$${event.earningsEstimate.high.toFixed(2)})`}
+            ` (range ${formatEps(event.earningsEstimate.low)}–${formatEps(event.earningsEstimate.high)})`}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -484,10 +716,11 @@ export default function RecentNews({
         )}
 
         <p className="mt-3 text-xs text-slate-500">
-          Stock impact scenarios are educational estimates based on the headline
-          and category — not financial advice or price predictions. Probabilities
-          use category baselines, headline tone, and exposure type — not live
-          market odds.
+          Upcoming earnings and dividends show a projected number, a hit
+          chance from this company&apos;s own surprise history (Student-t
+          predictive, shrunk toward the market beat rate), and a buy / short /
+          wait call for the print — not a 10-K. Headline scenarios still use
+          category baselines. None of this is financial advice.
         </p>
       </section>
 
@@ -508,8 +741,13 @@ export default function RecentNews({
           <h3 className="mb-3 text-lg font-semibold text-white">
             Upcoming Events (Next 30 Days)
           </h3>
-          <div className="grid gap-3 md:grid-cols-2">
-            {feed.upcomingEvents.slice(0, 12).map((event) => (
+          <p className="mb-3 text-xs text-slate-500">
+            Holdings first, then large caps. Each print has a model EPS (or
+            dividend), a chance of beating/paying, and when — if ever — a
+            buy or short would even be the base case.
+          </p>
+          <div className="grid gap-3 lg:grid-cols-2">
+            {feed.upcomingEvents.slice(0, 16).map((event) => (
               <EventCard
                 key={`${event.symbol}-${event.type}-${event.date}`}
                 event={event}

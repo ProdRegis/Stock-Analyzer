@@ -3,6 +3,7 @@ import {
   formatPValue,
   logGamma,
   regularizedIncompleteBeta,
+  studentTCdf,
   studentTTwoTailedP,
   tCrit95,
 } from "./stats";
@@ -24,6 +25,22 @@ describe("regularizedIncompleteBeta", () => {
 
   it("is 0.5 at x=0.5 when a=b", () => {
     expect(regularizedIncompleteBeta(0.5, 3, 3)).toBeCloseTo(0.5, 8);
+  });
+});
+
+describe("studentTCdf", () => {
+  it("is 0.5 at t=0", () => {
+    expect(studentTCdf(0, 30)).toBeCloseTo(0.5, 10);
+  });
+
+  it("recovers the one-sided 2.5% tail at the two-sided 5% critical value", () => {
+    expect(studentTCdf(1.96, 10_000)).toBeCloseTo(0.975, 2);
+    expect(studentTCdf(-1.96, 10_000)).toBeCloseTo(0.025, 2);
+  });
+
+  it("increases with t", () => {
+    expect(studentTCdf(1, 40)).toBeGreaterThan(studentTCdf(0, 40));
+    expect(studentTCdf(3, 40)).toBeGreaterThan(studentTCdf(1, 40));
   });
 });
 

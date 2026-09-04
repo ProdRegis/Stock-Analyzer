@@ -1,9 +1,10 @@
 import { NEWS_QUERIES, UPCOMING_EVENT_SYMBOLS } from "./news-constants";
 import { analyzeArticleImpacts } from "./news-impact";
 import { TTL, cached } from "./cache";
+import { researchEventForecast, listCalendarEvents } from "./event-research";
 import { fetchQuote } from "./market-data";
 import { yahooFinance } from "./yahoo-client";
-import type { NewsArticle, NewsFeed, UpcomingMarketEvent } from "./types";
+import type { EventForecast, NewsArticle, NewsFeed, UpcomingMarketEvent } from "./types";
 
 const HIGH_IMPACT_KEYWORDS = [
   "earnings",
@@ -169,73 +170,74 @@ async function fetchNewsForSymbol(symbol: string): Promise<NewsArticle[]> {
   );
 }
 
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  let index = 0;
+
+  async function runNext(): Promise<void> {
+    const current = index++;
+    if (current >= items.length) return;
+    results[current] = await worker(items[current]);
+    await runNext();
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, () => runNext())
+  );
+  return results;
+}
+
 async function fetchUpcomingEvents(
   symbols: string[]
 ): Promise<UpcomingMarketEvent[]> {
-  const events: UpcomingMarketEvent[] = [];
-  const now = Date.now();
-  const horizon = now + 30 * 24 * 60 * 60 * 1000;
-
-  for (const symbol of symbols) {
+  const nested = await runWithConcurrency(symbols, 4, async (symbol) => {
     try {
-      const [summary, quote] = await Promise.all([
-        cached(`summary:${symbol}:calendar`, TTL.quoteSummary, () =>
-          yahooFinance.quoteSummary(symbol, { modules: ["calendarEvents"] })
-        ),
-        fetchQuote(symbol),
-      ]);
-
-      const calendar = summary.calendarEvents;
+      const quote = await fetchQuote(symbol);
       const name = quote.shortName ?? quote.longName ?? symbol;
-
-      calendar?.earnings?.earningsDate?.forEach((date) => {
-        const time = date.getTime();
-        if (time >= now - 24 * 60 * 60 * 1000 && time <= horizon) {
-          events.push({
-            symbol,
-            name,
-            type: "earnings",
-            date: date.toISOString(),
-            earningsEstimate: {
-              low: calendar.earnings.earningsLow,
-              high: calendar.earnings.earningsHigh,
-              avg: calendar.earnings.earningsAverage,
-            },
-          });
-        }
-      });
-
-      calendar?.earnings?.earningsCallDate?.forEach((date) => {
-        const time = date.getTime();
-        if (time >= now - 24 * 60 * 60 * 1000 && time <= horizon) {
-          events.push({
-            symbol,
-            name,
-            type: "earnings_call",
-            date: date.toISOString(),
-          });
-        }
-      });
-
-      if (calendar?.exDividendDate) {
-        const time = calendar.exDividendDate.getTime();
-        if (time >= now && time <= horizon) {
-          events.push({
-            symbol,
-            name,
-            type: "dividend",
-            date: calendar.exDividendDate.toISOString(),
-          });
-        }
-      }
+      return listCalendarEvents(symbol, name);
     } catch {
-      // Skip symbols that fail to load calendar data.
+      return [] as UpcomingMarketEvent[];
+    }
+  });
+
+  const events = nested.flat();
+  const forecastByKey = new Map<string, EventForecast>();
+  const unique = [
+    ...new Set(
+      events
+        .filter((event) => event.type !== "earnings_call")
+        .map((event) => `${event.symbol}:${event.type}`)
+    ),
+  ];
+
+  await runWithConcurrency(unique, 3, async (key) => {
+    const [symbol, type] = key.split(":");
+    if (!symbol || (type !== "earnings" && type !== "dividend")) return;
+    const forecast = await researchEventForecast(symbol, type);
+    if (forecast) forecastByKey.set(key, forecast);
+  });
+
+  const earningsBySymbol = new Map<string, EventForecast>();
+  for (const [key, forecast] of forecastByKey) {
+    if (key.endsWith(":earnings")) {
+      earningsBySymbol.set(key.split(":")[0] ?? "", forecast);
     }
   }
 
-  return events.sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  return events
+    .map((event) => {
+      if (event.type === "earnings_call") {
+        const forecast = earningsBySymbol.get(event.symbol);
+        return forecast ? { ...event, forecast } : event;
+      }
+      const forecast = forecastByKey.get(`${event.symbol}:${event.type}`);
+      return forecast ? { ...event, forecast } : event;
+    })
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 function dedupeArticles(articles: NewsArticle[]): NewsArticle[] {
@@ -259,16 +261,17 @@ function sortArticles(articles: NewsArticle[]): NewsArticle[] {
 }
 
 export async function fetchNewsFeed(extraSymbols: string[] = []): Promise<NewsFeed> {
-  const symbolSet = new Set([
-    ...UPCOMING_EVENT_SYMBOLS,
-    ...extraSymbols.map((symbol) => symbol.toUpperCase()),
-  ]);
-  const symbols = [...symbolSet];
+  const symbols = [
+    ...new Set([
+      ...extraSymbols.map((symbol) => symbol.toUpperCase()).filter(Boolean),
+      ...UPCOMING_EVENT_SYMBOLS,
+    ]),
+  ];
 
   const [queryNews, symbolNews, upcomingEvents] = await Promise.all([
     Promise.all(NEWS_QUERIES.map((query) => fetchNewsForQuery(query))),
     Promise.all(symbols.slice(0, 8).map((symbol) => fetchNewsForSymbol(symbol))),
-    fetchUpcomingEvents(symbols.slice(0, 12)),
+    fetchUpcomingEvents(symbols.slice(0, 16)),
   ]);
 
   const articles = sortArticles(

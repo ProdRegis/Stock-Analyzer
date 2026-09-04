@@ -100,6 +100,21 @@ export function studentTTwoTailedP(t: number, df: number): number {
 }
 
 /**
+ * CDF of Student's t: P(T ≤ t). Built from the two-tailed identity
+ * P(|T| > |t|) so the event-forecast hit chances stay on the same
+ * incomplete-beta implementation as the beta t-test.
+ */
+export function studentTCdf(t: number, df: number): number {
+  if (!Number.isFinite(t) || !Number.isFinite(df) || df <= 0) {
+    return Number.NaN;
+  }
+  if (t === 0) return 0.5;
+
+  const twoTail = studentTTwoTailedP(t, df);
+  return t > 0 ? 1 - twoTail / 2 : twoTail / 2;
+}
+
+/**
  * Two-sided 95% critical value of Student's t, via a Cornish–Fisher
  * expansion around the normal quantile. Fine for df ≥ 3, which is all
  * we ever have (aligned returns need 30+ observations).

@@ -3,6 +3,7 @@ import { scoreBusinessQuality } from "./business-quality";
 import type { CompanyFundamentals } from "./fundamentals";
 import {
   buildInvestmentThesis,
+  buildReadingNext,
   nearbyTapeBuy,
   nearbyTapeSell,
 } from "./investment-thesis";
@@ -166,6 +167,25 @@ describe("buildInvestmentThesis", () => {
     expect(thesis.createValue.toLowerCase()).toContain("10-k");
     expect(thesis.captureValue.toLowerCase()).toContain("snapshot");
     expect(thesis.valuation.scenarios.length).toBeGreaterThan(0);
+    expect(thesis.readingNext.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("buildReadingNext", () => {
+  it("always offers the 10-K and earnings, and IR when a website exists", () => {
+    const withSite = buildReadingNext("AAPL", "https://apple.com");
+    expect(withSite.map((link) => link.label)).toEqual([
+      "Annual report (10-K)",
+      "Company site / IR",
+      "Recent earnings",
+    ]);
+    expect(withSite[0].href).toContain("AAPL");
+
+    const withoutSite = buildReadingNext("CMG", null);
+    expect(withoutSite.map((link) => link.label)).toEqual([
+      "Annual report (10-K)",
+      "Recent earnings",
+    ]);
   });
 });
 

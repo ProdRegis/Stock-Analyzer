@@ -24,6 +24,7 @@ import type {
   NotableHolder,
   ThesisGrowthScenario,
   ThesisPeer,
+  ThesisReadingLink,
   ThesisScreenFlag,
   ThesisStance,
   ThesisValuationMethod,
@@ -100,6 +101,43 @@ export function nearbyTapeSell(
   const price = roundTapePrice(raw);
   if (!(price > current)) return null;
   return { price, source: hit != null ? "resistance" : "buffer" };
+}
+
+function asHttpUrl(raw: string): string {
+  return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
+export function buildReadingNext(
+  symbol: string,
+  website: string | null
+): ThesisReadingLink[] {
+  const ticker = encodeURIComponent(symbol.trim().toUpperCase());
+  const links: ThesisReadingLink[] = [
+    {
+      label: "Annual report (10-K)",
+      href: `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${ticker}&type=10-K&dateb=&owner=exclude&count=5`,
+      detail:
+        "Skim first for what they even disclose. Then the business section, segments, and risk factors. Threads to pull start here, not in the model.",
+    },
+  ];
+
+  if (website) {
+    links.push({
+      label: "Company site / IR",
+      href: asHttpUrl(website),
+      detail:
+        "Investor-day decks and earnings slides often carry numbers the 10-K omits. Check both.",
+    });
+  }
+
+  links.push({
+    label: "Recent earnings",
+    href: `https://finance.yahoo.com/quote/${ticker}/analysis/`,
+    detail:
+      "Last four transcripts are enough for most names. Twenty years is practice, not a requirement — unless a number you need vanished from later filings.",
+  });
+
+  return links;
 }
 
 function firstSentences(text: string | null, count: number): string | null {
@@ -591,6 +629,8 @@ export function buildInvestmentThesis(input: ThesisBuildInput): InvestmentThesis
     },
     peers,
     notableHolders: input.notableHolders ?? [],
+    website: fundamentals.website,
+    readingNext: buildReadingNext(fundamentals.symbol, fundamentals.website),
     sources: [
       "Yahoo Finance quoteSummary (profile, financials, key statistics)",
       "Reverse DCF of trailing FCF or earnings, growth haircut 30%, fade to 2.5%",
@@ -670,7 +710,7 @@ export async function generateInvestmentThesis(
 ): Promise<InvestmentThesis> {
   const upper = symbol.trim().toUpperCase();
 
-  return cached(`thesis:v2:${upper}`, TTL.quoteSummary, async () => {
+  return cached(`thesis:v3:${upper}`, TTL.quoteSummary, async () => {
     const [fundamentals, rateInfo, notableHolders, history] = await Promise.all([
       fetchFundamentals(upper),
       fetchRiskFreeRate(),
