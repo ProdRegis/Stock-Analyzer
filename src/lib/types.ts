@@ -632,7 +632,7 @@ export interface ThirteenFFilerReport {
 }
 
 export type OptionRight = "call" | "put";
-export type VolStance = "sell_vol" | "buy_vol" | "wait";
+export type VolStance = "sell_vol" | "buy_vol" | "event_vol" | "wait";
 export type TermShape = "contango" | "backwardation" | "flat" | "unknown";
 export type PreferredOptionStructure =
   | "iron_condor"
@@ -651,7 +651,13 @@ export type OptionStructureId =
   | "put_credit_spread"
   | "iron_condor"
   | "covered_call"
-  | "cash_secured_put";
+  | "cash_secured_put"
+  | "custom";
+
+/** Jump from another tab into the Options desk. */
+export interface OpenOptionsHint {
+  eventDate?: string;
+}
 
 export interface OptionContract {
   contractSymbol: string;
@@ -765,8 +771,34 @@ export interface OptionsDeskSnapshot {
   warnings: string[];
   earningsDate: string | null;
   earningsInWindow: boolean;
+  /** Spot × ATM IV × √(days to print), when earnings sit inside this expiry. */
+  eventImpliedMove: number | null;
   chain: OptionChainRow[];
   structures: OptionStructureView[];
   modelNote: string;
+  asOf: string;
+}
+
+export interface OptionsScanRow {
+  symbol: string;
+  name: string;
+  spot: number | null;
+  atmIv: number | null;
+  rv30: number | null;
+  ivRvRatio: number | null;
+  vrp: number | null;
+  termShape: TermShape;
+  expiration: string | null;
+  dte: number | null;
+  earningsDate: string | null;
+  earningsInWindow: boolean;
+  stance: VolStance;
+  preferredStructure: PreferredOptionStructure;
+  reason: string;
+  skipped: string | null;
+}
+
+export interface OptionsBookScan {
+  rows: OptionsScanRow[];
   asOf: string;
 }

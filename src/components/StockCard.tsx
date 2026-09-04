@@ -1,13 +1,13 @@
 "use client";
 
 import PriceChart from "./PriceChart";
-import OpenThesisButton from "./OpenThesisButton";
+import SymbolJumps from "./SymbolJumps";
 import SellReminderBanner from "./SellReminderBanner";
 import {
   evaluateSellReminder,
   suggestSellPlan,
 } from "@/lib/sell-reminder";
-import type { PortfolioPositionPnl, StockAnalysis } from "@/lib/types";
+import type { OpenOptionsHint, PortfolioPositionPnl, StockAnalysis } from "@/lib/types";
 
 interface StockCardProps {
   analysis: StockAnalysis;
@@ -21,6 +21,7 @@ interface StockCardProps {
     targetDate?: string;
   }) => void;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }
 
 function formatPercent(value: number) {
@@ -44,6 +45,7 @@ export default function StockCard({
   targetDate,
   onTargetChange,
   onOpenThesis,
+  onOpenOptions,
 }: StockCardProps) {
   const { movingAverages: ma, breakout } = analysis;
   const reminder = evaluateSellReminder({
@@ -67,9 +69,13 @@ export default function StockCard({
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      {onOpenThesis && (
+      {(onOpenThesis || onOpenOptions) && (
         <div className="flex justify-end">
-          <OpenThesisButton symbol={analysis.symbol} onOpen={onOpenThesis} />
+          <SymbolJumps
+            symbol={analysis.symbol}
+            onOpenThesis={onOpenThesis}
+            onOpenOptions={onOpenOptions}
+          />
         </div>
       )}
 

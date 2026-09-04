@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Newspaper } from "lucide-react";
 import EmptyState from "./EmptyState";
-import OpenThesisButton from "./OpenThesisButton";
+import SymbolJumps from "./SymbolJumps";
 import PriceChart from "./PriceChart";
 import BusinessQualityBadge from "./BusinessQualityBadge";
 import { useStockAnalysis } from "@/hooks/useStockAnalysis";
@@ -12,6 +12,7 @@ import type {
   EventTradeStance,
   NewsArticle,
   NewsFeed,
+  OpenOptionsHint,
   StockImpactAnalysis,
   UpcomingMarketEvent,
 } from "@/lib/types";
@@ -21,6 +22,7 @@ interface RecentNewsProps {
   portfolioSymbols?: string[];
   active?: boolean;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }
 
 const impactStyles = {
@@ -277,9 +279,11 @@ function EventForecastBody({
 function EventCard({
   event,
   onOpenThesis,
+  onOpenOptions,
 }: {
   event: UpcomingMarketEvent;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const quality =
     event.forecast?.qualityGrade != null
@@ -297,9 +301,16 @@ function EventCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-white">{event.symbol}</span>
-            {onOpenThesis && (
-              <OpenThesisButton symbol={event.symbol} onOpen={onOpenThesis} />
-            )}
+            <SymbolJumps
+              symbol={event.symbol}
+              onOpenThesis={onOpenThesis}
+              onOpenOptions={onOpenOptions}
+              eventDate={
+                event.type === "earnings" || event.type === "earnings_call"
+                  ? event.date
+                  : undefined
+              }
+            />
             <span className="rounded-md bg-violet-500/5 px-2 py-0.5 text-xs text-violet-300">
               {eventLabel(event)}
             </span>
@@ -336,9 +347,11 @@ function formatSharpe(value: number) {
 function StockImpactCard({
   impact,
   onOpenThesis,
+  onOpenOptions,
 }: {
   impact: StockImpactAnalysis;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const { analysis, loading, error } = useStockAnalysis(impact.symbol);
   const [showChart, setShowChart] = useState(false);
@@ -353,9 +366,11 @@ function StockImpactCard({
     <div className="rounded-xl border border-slate-700/60 bg-slate-800/60 p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="font-semibold text-white">{impact.symbol}</span>
-        {onOpenThesis && (
-          <OpenThesisButton symbol={impact.symbol} onOpen={onOpenThesis} />
-        )}
+        <SymbolJumps
+          symbol={impact.symbol}
+          onOpenThesis={onOpenThesis}
+          onOpenOptions={onOpenOptions}
+        />
         <span className="rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
           {relationshipLabels[impact.relationship]}
         </span>
@@ -461,9 +476,11 @@ function StockImpactCard({
 function NewsCard({
   article,
   onOpenThesis,
+  onOpenOptions,
 }: {
   article: NewsArticle;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   return (
     <article className="surface-2 rounded-2xl p-4 transition hover:border-slate-500/50">
@@ -514,6 +531,7 @@ function NewsCard({
                     key={impact.symbol}
                     impact={impact}
                     onOpenThesis={onOpenThesis}
+                    onOpenOptions={onOpenOptions}
                   />
                 ))}
               </div>
@@ -553,6 +571,7 @@ export default function RecentNews({
   portfolioSymbols = [],
   active = true,
   onOpenThesis,
+  onOpenOptions,
 }: RecentNewsProps) {
   const [feed, setFeed] = useState<NewsFeed | null>(null);
   const [loading, setLoading] = useState(false);
@@ -752,6 +771,7 @@ export default function RecentNews({
                 key={`${event.symbol}-${event.type}-${event.date}`}
                 event={event}
                 onOpenThesis={onOpenThesis}
+                onOpenOptions={onOpenOptions}
               />
             ))}
           </div>
@@ -777,6 +797,7 @@ export default function RecentNews({
                   key={article.id}
                   article={article}
                   onOpenThesis={onOpenThesis}
+                  onOpenOptions={onOpenOptions}
                 />
               ))}
             </div>

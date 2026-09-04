@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { ChevronRight, LineChart } from "lucide-react";
-import OpenThesisButton from "./OpenThesisButton";
+import SymbolJumps from "./SymbolJumps";
 import RiskBadge from "./RiskBadge";
 import StockCard from "./StockCard";
 import {
@@ -11,7 +11,7 @@ import {
   hasSellTarget,
   suggestSellPlan,
 } from "@/lib/sell-reminder";
-import type { PortfolioAnalysis, PortfolioHolding } from "@/lib/types";
+import type { OpenOptionsHint, PortfolioAnalysis, PortfolioHolding } from "@/lib/types";
 
 function formatCurrency(value: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", {
@@ -29,6 +29,7 @@ interface HoldingsTableProps {
     target: { targetPrice?: number; targetDate?: string }
   ) => void;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }
 
 export default function HoldingsTable({
@@ -36,6 +37,7 @@ export default function HoldingsTable({
   holdings,
   onTargetChange,
   onOpenThesis,
+  onOpenOptions,
 }: HoldingsTableProps) {
   const [expandedSymbol, setExpandedSymbol] = useState<string | null>(null);
 
@@ -145,12 +147,11 @@ export default function HoldingsTable({
                             <span className="font-semibold text-white">
                               {holding.symbol}
                             </span>
-                            {onOpenThesis && (
-                              <OpenThesisButton
-                                symbol={holding.symbol}
-                                onOpen={onOpenThesis}
-                              />
-                            )}
+                            <SymbolJumps
+                              symbol={holding.symbol}
+                              onOpenThesis={onOpenThesis}
+                              onOpenOptions={onOpenOptions}
+                            />
                             {sellNow && (
                               <span className="rounded-md bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-medium text-amber-200">
                                 Sell now
@@ -223,6 +224,7 @@ export default function HoldingsTable({
                             onTargetChange(holding.symbol, target)
                           }
                           onOpenThesis={onOpenThesis}
+                          onOpenOptions={onOpenOptions}
                         />
                       </td>
                     </tr>

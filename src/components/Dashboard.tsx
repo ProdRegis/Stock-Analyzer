@@ -27,7 +27,7 @@ import {
   holdingsNeedReanalysis,
 } from "@/lib/holdings";
 import { workingPortfolioStore } from "@/lib/portfolios";
-import type { PortfolioAnalysis, PortfolioHolding } from "@/lib/types";
+import type { OpenOptionsHint, PortfolioAnalysis, PortfolioHolding } from "@/lib/types";
 
 function TabPanel({
   active,
@@ -56,6 +56,11 @@ export default function Dashboard() {
   const [thesisRequest, setThesisRequest] = useState<{
     symbol: string;
     at: number;
+  } | null>(null);
+  const [optionsRequest, setOptionsRequest] = useState<{
+    symbol: string;
+    at: number;
+    eventDate?: string;
   } | null>(null);
 
   const autoAnalyzed = useRef(false);
@@ -133,6 +138,15 @@ export default function Dashboard() {
   function openThesis(symbol: string) {
     setThesisRequest({ symbol, at: Date.now() });
     handleTabChange("thesis");
+  }
+
+  function openOptions(symbol: string, hint?: OpenOptionsHint) {
+    setOptionsRequest({
+      symbol,
+      at: Date.now(),
+      eventDate: hint?.eventDate,
+    });
+    handleTabChange("options");
   }
 
   function handleTargetChange(
@@ -266,6 +280,7 @@ export default function Dashboard() {
                     holdings={holdings}
                     onTargetChange={handleTargetChange}
                     onOpenThesis={openThesis}
+                    onOpenOptions={openOptions}
                   />
                 </div>
               </div>
@@ -288,6 +303,7 @@ export default function Dashboard() {
           <BreakoutScanner
             active={activeTab === "breakouts"}
             onOpenThesis={openThesis}
+            onOpenOptions={openOptions}
           />
         </TabPanel>
       )}
@@ -297,13 +313,18 @@ export default function Dashboard() {
           <BestStocksPicker
             active={activeTab === "picks"}
             onOpenThesis={openThesis}
+            onOpenOptions={openOptions}
           />
         </TabPanel>
       )}
 
       {visited("stop-loss") && (
         <TabPanel active={activeTab === "stop-loss"}>
-          <StopLossAdvisor holdings={holdings} onOpenThesis={openThesis} />
+          <StopLossAdvisor
+            holdings={holdings}
+            onOpenThesis={openThesis}
+            onOpenOptions={openOptions}
+          />
         </TabPanel>
       )}
 
@@ -313,6 +334,7 @@ export default function Dashboard() {
             active={activeTab === "copy-trading"}
             portfolioSymbols={portfolioSymbols}
             onOpenThesis={openThesis}
+            onOpenOptions={openOptions}
           />
         </TabPanel>
       )}
@@ -323,6 +345,7 @@ export default function Dashboard() {
             portfolioSymbols={portfolioSymbols}
             active={activeTab === "news"}
             onOpenThesis={openThesis}
+            onOpenOptions={openOptions}
           />
         </TabPanel>
       )}
@@ -331,6 +354,10 @@ export default function Dashboard() {
         <TabPanel active={activeTab === "options"}>
           <OptionsDesk
             active={activeTab === "options"}
+            portfolioSymbols={portfolioSymbols}
+            requestedSymbol={optionsRequest?.symbol}
+            requestedAt={optionsRequest?.at}
+            requestedEventDate={optionsRequest?.eventDate}
             onOpenThesis={openThesis}
           />
         </TabPanel>

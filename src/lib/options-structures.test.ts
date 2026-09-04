@@ -7,6 +7,7 @@ import {
   longCall,
   longPut,
   longStraddle,
+  markToModelPnl,
   putCreditSpread,
   shortCall,
 } from "./options-structures";
@@ -88,5 +89,32 @@ describe("putCreditSpread", () => {
     const legs = putCreditSpread(100, 2.5, 95, 1);
     expect(expirationPnl(110, legs)).toBeCloseTo(150, 4);
     expect(expirationPnl(90, legs)).toBeCloseTo(-350, 4);
+  });
+});
+
+describe("markToModelPnl", () => {
+  it("is near zero at the entry spot when marked at the entry IV", () => {
+    const legs = longCall(100, 3).map((leg) => ({ ...leg, iv: 0.25 }));
+    const env = {
+      timeYears: 30 / 365.25,
+      rate: 0.04,
+      dividendYield: 0,
+    };
+    const atSpot = markToModelPnl(100, legs, env);
+    expect(atSpot).not.toBeNull();
+    expect(Math.abs(atSpot!)).toBeLessThan(400);
+  });
+
+  it("is above expiration P&L for a long call still well before expiry", () => {
+    const legs = longCall(100, 3).map((leg) => ({ ...leg, iv: 0.3 }));
+    const env = {
+      timeYears: 45 / 365.25,
+      rate: 0.04,
+      dividendYield: 0,
+    };
+    const live = markToModelPnl(100, legs, env);
+    const expiry = expirationPnl(100, legs);
+    expect(live).not.toBeNull();
+    expect(live!).toBeGreaterThan(expiry);
   });
 });

@@ -9,7 +9,9 @@ and news into a single dashboard.
 
 ## Features
 
-The dashboard is organized into eight tabs.
+The dashboard is organized into eight tabs, grouped as research
+(Portfolio, Thesis, Options, News) and find-names (Breakouts, Dips & Shorts,
+Stops, Copy Trading).
 
 **Portfolio Analysis** — Enter tickers, share counts, and optionally your
 average cost. Returns a weighted risk score built from volatility, beta,
@@ -46,14 +48,14 @@ Pass instead of inventing a buy price. Related names come from Yahoo's peer
 list. Concentrated 13F stock-pickers who hold the name are listed when that
 data is already in cache. Each write-up ends with links to the 10-K, IR site,
 and recent earnings — the snapshot is not a substitute for those. Recent
-theses stay in this browser. **Thesis** on a holding, stop, headline, or 13F
+theses stay in this browser. **Thesis** or **Options** on a holding, stop, headline, or 13F
 row jumps here.
 
 **Breakout Scanner** — Ranks stocks by breakout likelihood using proximity to
 resistance and how past breakouts resolved, then lifts durable businesses
 (profitable, real margins) above similar chart setups that look speculative.
-Search accepts either a ticker or a company name. **Open thesis** jumps to the
-Investment Thesis tab for that name.
+Search accepts either a ticker or a company name. **Thesis** and **Options**
+jump to those tabs for that name.
 
 **Dips & Shorts** — Finds oversold candidates and pairs each one with an entry
 case, expected timing, and a stop level. Sweeps a universe of roughly 85 liquid
@@ -89,21 +91,26 @@ historical surprise, shrunk), a Student-t chance of beating that consensus, and
 a buy / short / wait call for *when* — before the print only when the beat
 history and post-print drift are both identified. Dividends show a quarterly
 run-rate and a pay/maintain chance from payout and cash-flow coverage; chasing
-the ex-date is not treated as an edge.
+the ex-date is not treated as an edge. **Options** on an earnings card opens
+the desk on the expiry that still contains the print.
 
 **Options** — Search a ticker and read the listed chain the way a vol trader
 does, not as a leveraged directional bet. ATM implied vol is inverted from
 the market premium with Black–Scholes–Merton (and compared to Yahoo's IV when
 it is present). Realized vol is Yang–Zhang when the bars support it, else
 Garman–Klass / close-to-close, at 10 / 20 / 30 / 60 / 90 day lookbacks. The
-stance is IV versus 30-day RV, confirmed by term-structure shape (contango vs
-backwardation) and killed by a wide bid–ask, thin open interest, an inverted
-front, or earnings inside the selected expiry. Theta is labeled as the rent
-for gamma, not an edge. Structures (long straddle / strangle, debit and credit
-verticals, iron condor, covered-call overlay, cash-secured put) show expiration
-P&L, breakevens, defined-risk capital, and net Greeks. Naked short calls are
-not the recommended expression of a short-vol view. This is not a broker and
-does not estimate Interactive Brokers margin.
+everyday stance is IV versus 30-day RV, confirmed by term-structure shape
+(contango vs backwardation) and killed by a wide bid–ask, thin open interest,
+or an inverted front. A print inside the selected expiry is **event vol**, not
+a VRP sale — the desk offers a long straddle versus stand-aside, and sizes the
+implied move to the print date. Default expiry is ~21–45 DTE; 0 DTE and
+front-week listings stay behind a weeklies toggle. Click calls and puts on the
+chain to build a custom structure (ask to buy, bid to sell). Charts show
+expiration P&L plus a mark-to-model path at current IV and a +5 vol-point
+shock. Holdings get a book scan of IV/RV and term shape; click a row to open
+that chain. Theta is labeled as the rent for gamma, not an edge. Naked short
+calls are not the recommended expression of a short-vol view. This is not a
+broker and does not estimate Interactive Brokers margin.
 
 Across all tabs: portfolios are saved in the browser and restored on return,
 charts plot your cost basis, and the header shows live market status alongside a

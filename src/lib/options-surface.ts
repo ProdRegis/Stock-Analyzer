@@ -141,37 +141,70 @@ export function volStance(input: StanceInput): VolStanceResult {
     );
   }
 
+  if (illiquid) {
+    reasons.push(
+      ratio != null
+        ? `IV/RV is ${ratio.toFixed(2)}, but this chain is not liquid enough to express it cleanly.`
+        : "This chain is not liquid enough to express a vol view cleanly."
+    );
+    return {
+      stance: "wait",
+      preferredStructure: "none",
+      ivRvRatio: ratio,
+      vrp,
+      reasons,
+      warnings,
+    };
+  }
+
+  if (input.earningsInWindow) {
+    if (input.atmIv == null) {
+      reasons.push(
+        "A print sits inside this expiration, but there is no clean ATM IV to size an implied move. No-trade zone."
+      );
+      return {
+        stance: "wait",
+        preferredStructure: "none",
+        ivRvRatio: ratio,
+        vrp,
+        reasons,
+        warnings,
+      };
+    }
+
+    reasons.push(
+      "This is event vol, not the everyday variance risk premium. The ATM straddle is pricing a gap; 30-day RV is the wrong benchmark."
+    );
+    if (ratio != null && ratio >= SELL_RATIO) {
+      reasons.push(
+        `IV looks ${ratio.toFixed(2)}× 30-day realized because the market is charging for the print, not because insurance is sticky-rich. Selling a condor through earnings is selling the gap.`
+      );
+    } else if (ratio != null && ratio <= BUY_RATIO) {
+      reasons.push(
+        `IV is only ${ratio.toFixed(2)}× recent realized even with a print inside the window. Unusual — the straddle may still underprice the move you assign to the event.`
+      );
+    } else if (ratio != null) {
+      reasons.push(
+        `IV/RV is ${ratio.toFixed(2)}. Ignore that band: the relevant comparison is implied move versus the move you give the print.`
+      );
+    }
+    reasons.push(
+      "Long the ATM straddle if you think realized |move| beats what the chain implies; otherwise stand aside. Do not harvest VRP through the print."
+    );
+
+    return {
+      stance: "event_vol",
+      preferredStructure: "long_straddle",
+      ivRvRatio: ratio,
+      vrp,
+      reasons,
+      warnings,
+    };
+  }
+
   if (ratio == null) {
     reasons.push(
       "Not enough of a clean IV/RV read to take a vol view. No-trade zone."
-    );
-    return {
-      stance: "wait",
-      preferredStructure: "none",
-      ivRvRatio: ratio,
-      vrp,
-      reasons,
-      warnings,
-    };
-  }
-
-  if (illiquid) {
-    reasons.push(
-      `IV/RV is ${ratio.toFixed(2)}, but this chain is not liquid enough to express it cleanly.`
-    );
-    return {
-      stance: "wait",
-      preferredStructure: "none",
-      ivRvRatio: ratio,
-      vrp,
-      reasons,
-      warnings,
-    };
-  }
-
-  if (input.earningsInWindow && ratio >= SELL_RATIO) {
-    reasons.push(
-      `IV is rich versus 30-day realized (${ratio.toFixed(2)}×), but the richness is likely the print. Selling that vol is selling the gap, not harvesting VRP.`
     );
     return {
       stance: "wait",

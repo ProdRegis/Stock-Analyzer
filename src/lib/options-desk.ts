@@ -53,9 +53,12 @@ import type {
   OptionRight,
   OptionStructureId,
   OptionStructureView,
+  OptionsBookScan,
   OptionsDeskSnapshot,
+  OptionsScanRow,
 } from "./types";
 import { yahooFinance } from "./yahoo-client";
+import { mapPool } from "./cusip-ticker";
 
 interface RawContract {
   contractSymbol?: string;
@@ -121,6 +124,35 @@ export function calendarDte(expiration: string, now = new Date()): number {
   );
   if (!Number.isFinite(exp)) return 0;
   return Math.max(0, Math.round((exp - today) / 86_400_000));
+}
+
+/** Front-week / 0 DTE: useful on the term chart, noisy as a default trade. */
+export function isFrontWeek(dte: number): boolean {
+  return dte < 7;
+}
+
+/** Prefer ~21–45 DTE; never land on 0 DTE when a listed expiry exists. */
+export function pickDefaultExpiration(
+  rows: Array<{ iso: string; dte: number }>
+): string | null {
+  if (rows.length === 0) return null;
+  const listed = rows.filter((row) => row.dte >= 7);
+  const pool = listed.length > 0 ? listed : rows;
+  return nearestBy(pool, 30, (row) => row.dte)?.iso ?? pool[0].iso;
+}
+
+export function expiryOnOrAfter(
+  expirations: Array<{ expiration: string }>,
+  eventDate: string
+): string | null {
+  const sorted = [...expirations].sort((a, b) =>
+    a.expiration.localeCompare(b.expiration)
+  );
+  return (
+    sorted.find((row) => row.expiration >= eventDate)?.expiration ??
+    sorted.at(-1)?.expiration ??
+    null
+  );
 }
 
 export function normalizeYahooIv(value: unknown): number | null {
@@ -710,7 +742,7 @@ export async function buildOptionsDesk(
   const selectedIso =
     expiryIso && expiryRows.some((row) => row.iso === expiryIso)
       ? expiryIso
-      : (nearestBy(expiryRows, 30, (row) => row.dte)?.iso ?? expiryRows[0].iso);
+      : (pickDefaultExpiration(expiryRows) ?? expiryRows[0].iso);
   const selected =
     expiryRows.find((row) => row.iso === selectedIso) ?? expiryRows[0];
 
@@ -791,6 +823,10 @@ export async function buildOptionsDesk(
     earningsDate != null &&
     calendarDte(earningsDate, now) <= selected.dte &&
     calendarDte(earningsDate, now) >= 0;
+  const eventImpliedMove =
+    earningsInWindow && atmIv != null && earningsDate
+      ? expectedMove(spot, atmIv, Math.max(calendarDte(earningsDate, now), 1))
+      : null;
 
   const stance = volStance({
     atmIv,
@@ -860,10 +896,221 @@ export async function buildOptionsDesk(
     warnings: stance.warnings,
     earningsDate,
     earningsInWindow,
+    eventImpliedMove,
     chain: selected.rows,
     structures,
     modelNote:
       "Greeks and inverted IV use Black–Scholes–Merton (European, constant vol). Listed equity options are American; early-exercise value is not in these numbers. The model translates the chain into IV and risk — it does not say what an option 'should' cost.",
     asOf: new Date().toISOString(),
   };
+}
+
+const SCAN_LIMIT = 12;
+const SCAN_CONCURRENCY = 3;
+
+function skippedScanRow(
+  symbol: string,
+  reason: string,
+  extras: Partial<OptionsScanRow> = {}
+): OptionsScanRow {
+  return {
+    symbol,
+    name: extras.name ?? symbol,
+    spot: extras.spot ?? null,
+    atmIv: extras.atmIv ?? null,
+    rv30: extras.rv30 ?? null,
+    ivRvRatio: extras.ivRvRatio ?? null,
+    vrp: extras.vrp ?? null,
+    termShape: extras.termShape ?? "unknown",
+    expiration: extras.expiration ?? null,
+    dte: extras.dte ?? null,
+    earningsDate: extras.earningsDate ?? null,
+    earningsInWindow: extras.earningsInWindow ?? false,
+    stance: extras.stance ?? "wait",
+    preferredStructure: extras.preferredStructure ?? "none",
+    reason: extras.reason ?? reason,
+    skipped: reason,
+  };
+}
+
+async function scanOneSymbol(symbol: string): Promise<OptionsScanRow> {
+  const upper = symbol.trim().toUpperCase();
+  try {
+    const [history, quote, rateInfo, index, earningsDate] = await Promise.all([
+      fetchDailyHistory(upper),
+      fetchQuote(upper),
+      fetchRiskFreeRate(),
+      fetchRawChain(upper),
+      nextEarningsDate(upper),
+    ]);
+
+    const name =
+      (typeof quote.shortName === "string" && quote.shortName) ||
+      (typeof quote.longName === "string" && quote.longName) ||
+      upper;
+    const spot =
+      asNum(quote.regularMarketPrice) ??
+      asNum(index.quote?.regularMarketPrice) ??
+      (history.at(-1)?.close ?? null);
+    if (spot == null || !(spot > 0)) {
+      return skippedScanRow(upper, "No live price", { name });
+    }
+
+    const expirationDates = (index.expirationDates ?? []).filter(
+      (date): date is Date => date instanceof Date
+    );
+    if (expirationDates.length === 0) {
+      return skippedScanRow(upper, "No listed options", { name, spot });
+    }
+
+    const now = new Date();
+    const metas = expirationDates
+      .map((date) => toIsoDate(date))
+      .filter((iso): iso is string => iso != null)
+      .map((iso) => ({ iso, dte: calendarDte(iso, now), date: expirationDates.find((d) => toIsoDate(d) === iso)! }))
+      .filter((row) => row.dte >= 0);
+
+    const selectedIso = pickDefaultExpiration(metas);
+    const selectedMeta = metas.find((row) => row.iso === selectedIso) ?? metas[0];
+    if (!selectedMeta) {
+      return skippedScanRow(upper, "No listed options", { name, spot });
+    }
+
+    const farMeta =
+      metas.find((row) => row.dte >= 45 && row.iso !== selectedMeta.iso) ??
+      [...metas].reverse().find((row) => row.dte > selectedMeta.dte) ??
+      null;
+
+    const indexIso = toIsoDate(index.options?.[0]?.expirationDate);
+    const loadExpiry = async (iso: string, date: Date) => {
+      const raw = iso === indexIso ? index : await fetchRawChain(upper, date);
+      return raw.options?.[0] ?? null;
+    };
+
+    const [selectedExpiry, farExpiry] = await Promise.all([
+      loadExpiry(selectedMeta.iso, selectedMeta.date),
+      farMeta ? loadExpiry(farMeta.iso, farMeta.date) : Promise.resolve(null),
+    ]);
+
+    const rate = rateInfo.rate;
+    const quoteFields = quote as Record<string, unknown>;
+    const dividendYield = asUnit(
+      quoteFields.trailingAnnualDividendYield ??
+        quoteFields.dividendYield ??
+        index.quote?.trailingAnnualDividendYield
+    );
+
+    const selectedRows = selectedExpiry
+      ? rowsFromExpiry(
+          selectedExpiry,
+          spot,
+          timeYearsFromDays(Math.max(selectedMeta.dte, 1)),
+          rate,
+          dividendYield
+        )
+      : [];
+    const selectedAtm = atmFromRows(selectedRows, spot);
+    const atmIv = selectedAtm?.iv ?? null;
+
+    const farRows = farExpiry && farMeta
+      ? rowsFromExpiry(
+          farExpiry,
+          spot,
+          timeYearsFromDays(Math.max(farMeta.dte, 1)),
+          rate,
+          dividendYield
+        )
+      : [];
+    const farAtm = atmFromRows(farRows, spot);
+
+    const termPoints: TermPoint[] = [];
+    if (atmIv != null) {
+      termPoints.push({
+        expiration: selectedMeta.iso,
+        dte: selectedMeta.dte,
+        atmIv,
+      });
+    }
+    if (farMeta && farAtm?.iv != null) {
+      termPoints.push({
+        expiration: farMeta.iso,
+        dte: farMeta.dte,
+        atmIv: farAtm.iv,
+      });
+    }
+    const termShape = classifyTermStructure(termPoints);
+
+    const windows = realizedVolWindows(history);
+    const rv30 =
+      windows.find((window) => window.lookbackDays === 30)?.preferred ?? null;
+    const rvHistory = rollingCloseToClose(history, 20);
+    const ivPct = percentileRank(rvHistory, atmIv ?? Number.NaN);
+
+    const atmCall = selectedAtm?.call ?? null;
+    const atmPut = selectedAtm?.put ?? null;
+    const atmSpreadPct =
+      atmCall?.spreadPct != null && atmPut?.spreadPct != null
+        ? Math.max(atmCall.spreadPct, atmPut.spreadPct)
+        : (atmCall?.spreadPct ?? atmPut?.spreadPct ?? null);
+    const atmOi =
+      (atmCall?.openInterest ?? 0) + (atmPut?.openInterest ?? 0) || null;
+
+    const earningsInWindow =
+      earningsDate != null &&
+      calendarDte(earningsDate, now) <= selectedMeta.dte &&
+      calendarDte(earningsDate, now) >= 0;
+
+    const stance = volStance({
+      atmIv,
+      rv30,
+      term: termShape,
+      ivPercentile: ivPct,
+      atmSpreadPct,
+      atmOpenInterest: atmOi,
+      earningsInWindow,
+      hasDefinedRiskStrikes: selectedRows.length >= 8,
+    });
+
+    return {
+      symbol: upper,
+      name,
+      spot,
+      atmIv,
+      rv30,
+      ivRvRatio: ivRvRatio(atmIv, rv30),
+      vrp: atmIv != null && rv30 != null ? atmIv - rv30 : null,
+      termShape,
+      expiration: selectedMeta.iso,
+      dte: selectedMeta.dte,
+      earningsDate,
+      earningsInWindow,
+      stance: stance.stance,
+      preferredStructure: stance.preferredStructure,
+      reason: stance.reasons[0] ?? "No-trade zone.",
+      skipped: null,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Options scan failed";
+    const noChain = /no listed options/i.test(message);
+    return skippedScanRow(
+      upper,
+      noChain ? "No listed options" : "Could not read a chain"
+    );
+  }
+}
+
+export async function buildOptionsScan(
+  symbols: string[]
+): Promise<OptionsBookScan> {
+  const unique = [
+    ...new Set(
+      symbols
+        .map((symbol) => symbol.trim().toUpperCase())
+        .filter(Boolean)
+    ),
+  ].slice(0, SCAN_LIMIT);
+
+  const rows = await mapPool(unique, SCAN_CONCURRENCY, scanOneSymbol);
+  return { rows, asOf: new Date().toISOString() };
 }

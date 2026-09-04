@@ -6,10 +6,11 @@ import DemoBadge from "./DemoBadge";
 import EmptyState from "./EmptyState";
 import PriceChart from "./PriceChart";
 import BusinessQualityBadge from "./BusinessQualityBadge";
+import SymbolJumps from "./SymbolJumps";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
 import StopLossReasonList from "./StopLossReasonList";
 import { formatMarketState } from "@/lib/format";
-import type { BuyTimingWindow, DipCandidate, DipSensitivity, MarketSearchResult, SellReasonDetail, TradeDirection } from "@/lib/types";
+import type { BuyTimingWindow, DipCandidate, DipSensitivity, MarketSearchResult, OpenOptionsHint, SellReasonDetail, TradeDirection } from "@/lib/types";
 
 type DirectionFilter = "all" | TradeDirection;
 type TimingFilter = "all" | "tomorrow" | "this_week";
@@ -175,9 +176,11 @@ function DirectionBadge({ direction }: { direction: TradeDirection }) {
 function DipCandidateCard({
   candidate,
   onOpenThesis,
+  onOpenOptions,
 }: {
   candidate: DipCandidate;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -189,15 +192,11 @@ function DipCandidateCard({
             <h3 className="text-xl font-semibold text-white">{candidate.symbol}</h3>
             <DirectionBadge direction={candidate.direction} />
             <BusinessQualityBadge quality={candidate.businessQuality} size="sm" />
-            {onOpenThesis && (
-              <button
-                type="button"
-                onClick={() => onOpenThesis(candidate.symbol)}
-                className="rounded-full border border-slate-700 px-2.5 py-1 text-xs font-medium text-blue-300 transition hover:border-blue-500/40 hover:text-blue-200"
-              >
-                Open thesis
-              </button>
-            )}
+            <SymbolJumps
+              symbol={candidate.symbol}
+              onOpenThesis={onOpenThesis}
+              onOpenOptions={onOpenOptions}
+            />
             <span className="rounded-full bg-blue-500/15 px-3 py-1 text-sm font-medium text-blue-300">
               {candidate.recoveryScore}% score
             </span>
@@ -438,9 +437,11 @@ function DipCandidateCard({
 export default function BestStocksPicker({
   active = true,
   onOpenThesis,
+  onOpenOptions,
 }: {
   active?: boolean;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const [candidates, setCandidates] = useState<DipCandidate[]>([]);
   const candidatesRef = useRef<DipCandidate[]>([]);
@@ -822,6 +823,7 @@ export default function BestStocksPicker({
                 key={`${candidate.symbol}-${candidate.direction}`}
                 candidate={candidate}
                 onOpenThesis={onOpenThesis}
+                onOpenOptions={onOpenOptions}
               />
             ))
           )}

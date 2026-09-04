@@ -6,7 +6,7 @@
  * here are expiration P&L for one spread, multiplier 100 unless noted.
  */
 
-import type { OptionType } from "./black-scholes";
+import { blackScholesPrice, type OptionType } from "./black-scholes";
 
 export type OptionSide = "long" | "short";
 
@@ -17,6 +17,8 @@ export interface StructureLeg {
   /** Per-share premium paid (long) or received (short). */
   premium: number;
   quantity: number;
+  /** Decimal IV used to mark the leg before expiry. */
+  iv?: number | null;
 }
 
 export interface ExpirationStats {
@@ -102,11 +104,7 @@ function findBreakevens(
   return breakevens.filter((value) => value >= 0);
 }
 
-function payoffCurve(
-  legs: StructureLeg[],
-  multiplier: number,
-  steps = 61
-): Array<{ price: number; pnl: number }> {
+export function payoffGrid(legs: StructureLeg[], steps = 61): number[] {
   const strikes = uniqueStrikes(legs);
   const mid = strikes[Math.floor(strikes.length / 2)] ?? 100;
   const lo = Math.max(0, Math.min(strikes[0] ?? mid * 0.7, mid * 0.7));
@@ -114,12 +112,79 @@ function payoffCurve(
   const span = Math.max(hi - lo, mid * 0.4);
   const start = Math.max(0, mid - span);
   const end = mid + span;
-  const points: Array<{ price: number; pnl: number }> = [];
+  const points: number[] = [];
   for (let i = 0; i < steps; i++) {
-    const price = start + (i / (steps - 1)) * (end - start);
-    points.push({ price, pnl: expirationPnl(price, legs, multiplier) });
+    points.push(start + (i / (steps - 1)) * (end - start));
   }
   return points;
+}
+
+function payoffCurve(
+  legs: StructureLeg[],
+  multiplier: number,
+  steps = 61
+): Array<{ price: number; pnl: number }> {
+  return payoffGrid(legs, steps).map((price) => ({
+    price,
+    pnl: expirationPnl(price, legs, multiplier),
+  }));
+}
+
+export interface MarkToModelEnv {
+  timeYears: number;
+  rate: number;
+  dividendYield: number;
+  /** Additive shock to each leg's IV, e.g. 0.05 = +5 vol points. */
+  volShock?: number;
+  multiplier?: number;
+}
+
+/** Instantaneous P&L: mark each leg with BSM at the current remaining T and IV. */
+export function markToModelPnl(
+  spot: number,
+  legs: StructureLeg[],
+  env: MarkToModelEnv
+): number | null {
+  if (!(spot >= 0) || legs.length === 0) return 0;
+  const multiplier = env.multiplier ?? EQUITY_MULTIPLIER;
+  const shock = env.volShock ?? 0;
+  let pnl = 0;
+  for (const leg of legs) {
+    const iv = (leg.iv ?? null) != null ? (leg.iv as number) + shock : null;
+    if (iv == null || !(iv > 0)) return null;
+    const marked = blackScholesPrice({
+      type: leg.type,
+      spot,
+      strike: leg.strike,
+      timeYears: env.timeYears,
+      rate: env.rate,
+      dividendYield: env.dividendYield,
+      volatility: iv,
+    });
+    if (marked == null) return null;
+    pnl += signedQty(leg) * (marked - leg.premium) * multiplier;
+  }
+  return pnl;
+}
+
+export function structureCurves(
+  legs: StructureLeg[],
+  env: MarkToModelEnv,
+  steps = 61
+): Array<{
+  price: number;
+  expiration: number;
+  live: number | null;
+  shock: number | null;
+}> {
+  const multiplier = env.multiplier ?? EQUITY_MULTIPLIER;
+  const shockedEnv = { ...env, volShock: (env.volShock ?? 0) + 0.05 };
+  return payoffGrid(legs, steps).map((price) => ({
+    price,
+    expiration: expirationPnl(price, legs, multiplier),
+    live: markToModelPnl(price, legs, env),
+    shock: markToModelPnl(price, legs, shockedEnv),
+  }));
 }
 
 export function expirationStats(

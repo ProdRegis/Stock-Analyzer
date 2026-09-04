@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   calendarDte,
+  expiryOnOrAfter,
+  isFrontWeek,
   normalizeYahooIv,
+  pickDefaultExpiration,
   pickExpirationDates,
   windowStrikes,
 } from "./options-desk";
@@ -36,6 +39,48 @@ describe("pickExpirationDates", () => {
     expect(dtes.some((dte) => Math.abs(dte - 30) <= 8)).toBe(true);
     expect(picked.length).toBeGreaterThan(2);
     expect(picked.length).toBeLessThanOrEqual(7);
+  });
+});
+
+describe("pickDefaultExpiration", () => {
+  it("skips 0 DTE and lands near 30 DTE", () => {
+    const rows = [0, 4, 11, 18, 25, 32, 60].map((dte) => ({
+      iso: `d${dte}`,
+      dte,
+    }));
+    expect(pickDefaultExpiration(rows)).toBe("d32");
+  });
+
+  it("falls back to the front if nothing is listed past a week", () => {
+    expect(
+      pickDefaultExpiration([
+        { iso: "today", dte: 0 },
+        { iso: "friday", dte: 4 },
+      ])
+    ).toBe("friday");
+  });
+});
+
+describe("expiryOnOrAfter", () => {
+  it("picks the first expiry that still contains the print", () => {
+    expect(
+      expiryOnOrAfter(
+        [
+          { expiration: "2026-04-10" },
+          { expiration: "2026-04-17" },
+          { expiration: "2026-05-15" },
+        ],
+        "2026-04-16"
+      )
+    ).toBe("2026-04-17");
+  });
+});
+
+describe("isFrontWeek", () => {
+  it("treats sub-7 DTE as front week", () => {
+    expect(isFrontWeek(0)).toBe(true);
+    expect(isFrontWeek(6)).toBe(true);
+    expect(isFrontWeek(7)).toBe(false);
   });
 });
 

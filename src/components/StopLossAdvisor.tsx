@@ -3,12 +3,13 @@
 import { Fragment, useCallback, useMemo, useState } from "react";
 import { ShieldAlert, TriangleAlert, Wallet } from "lucide-react";
 import EmptyState from "./EmptyState";
-import OpenThesisButton from "./OpenThesisButton";
+import SymbolJumps from "./SymbolJumps";
 import PriceChart from "./PriceChart";
 import StopLossReasonList from "./StopLossReasonList";
 import { Skeleton } from "./Skeleton";
 import { formatMarketState } from "@/lib/format";
 import type {
+  OpenOptionsHint,
   PortfolioHolding,
   StopLossRecommendation,
   TradeDirection,
@@ -17,6 +18,7 @@ import type {
 interface StopLossAdvisorProps {
   holdings: PortfolioHolding[];
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }
 
 interface BatchFailure {
@@ -44,6 +46,7 @@ function formatTimestamp(value: string) {
 export default function StopLossAdvisor({
   holdings,
   onOpenThesis,
+  onOpenOptions,
 }: StopLossAdvisorProps) {
   const validHoldings = useMemo(
     () =>
@@ -306,12 +309,11 @@ export default function StopLossAdvisor({
                         <td className="py-3 pr-4">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="font-medium text-white">{row.symbol}</p>
-                            {onOpenThesis && (
-                              <OpenThesisButton
-                                symbol={row.symbol}
-                                onOpen={onOpenThesis}
-                              />
-                            )}
+                            <SymbolJumps
+                              symbol={row.symbol}
+                              onOpenThesis={onOpenThesis}
+                              onOpenOptions={onOpenOptions}
+                            />
                           </div>
                           <p className="truncate text-xs text-slate-500">
                             {row.shares} sh · {formatMarketState(row.marketState)}

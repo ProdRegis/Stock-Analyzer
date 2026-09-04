@@ -6,9 +6,10 @@ import DemoBadge from "./DemoBadge";
 import EmptyState from "./EmptyState";
 import PriceChart from "./PriceChart";
 import BusinessQualityBadge from "./BusinessQualityBadge";
+import SymbolJumps from "./SymbolJumps";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
 import { formatMarketState } from "@/lib/format";
-import type { BreakoutCandidate, MarketSearchResult } from "@/lib/types";
+import type { BreakoutCandidate, MarketSearchResult, OpenOptionsHint } from "@/lib/types";
 
 function formatPercent(value: number) {
   return `${(value * 100).toFixed(1)}%`;
@@ -49,9 +50,11 @@ function LiveValue({
 function CandidateCard({
   candidate,
   onOpenThesis,
+  onOpenOptions,
 }: {
   candidate: BreakoutCandidate;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -67,15 +70,11 @@ function CandidateCard({
               <LiveValue value={`${candidate.likelihoodScore}% likelihood`} className="text-blue-300" />
             </span>
             <BusinessQualityBadge quality={candidate.businessQuality} size="sm" />
-            {onOpenThesis && (
-              <button
-                type="button"
-                onClick={() => onOpenThesis(candidate.symbol)}
-                className="rounded-full border border-slate-700 px-2.5 py-1 text-xs font-medium text-blue-300 transition hover:border-blue-500/40 hover:text-blue-200"
-              >
-                Open thesis
-              </button>
-            )}
+            <SymbolJumps
+              symbol={candidate.symbol}
+              onOpenThesis={onOpenThesis}
+              onOpenOptions={onOpenOptions}
+            />
             <span className="rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-500">
               {formatMarketState(candidate.marketState)}
             </span>
@@ -253,9 +252,11 @@ function CandidateCard({
 export default function BreakoutScanner({
   active = true,
   onOpenThesis,
+  onOpenOptions,
 }: {
   active?: boolean;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const [candidates, setCandidates] = useState<BreakoutCandidate[]>([]);
   const candidatesRef = useRef<BreakoutCandidate[]>([]);
@@ -494,6 +495,7 @@ export default function BreakoutScanner({
               key={candidate.symbol}
               candidate={candidate}
               onOpenThesis={onOpenThesis}
+              onOpenOptions={onOpenOptions}
             />
           ))}
         </div>

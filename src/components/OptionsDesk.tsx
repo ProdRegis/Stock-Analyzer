@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -16,10 +17,21 @@ import EmptyState from "./EmptyState";
 import OpenThesisButton from "./OpenThesisButton";
 import { Skeleton } from "./Skeleton";
 import StockSearchInput, { resolveStockQuery } from "./StockSearchInput";
+import { timeYearsFromDays } from "@/lib/black-scholes";
+import {
+  customStructureView,
+  structureMatchesStance,
+  toggleDraftLeg,
+  type DraftLeg,
+} from "@/lib/options-builder";
+import { structureCurves, type StructureLeg } from "@/lib/options-structures";
 import { lastOptionsSymbolStore } from "@/lib/tab-memory";
 import type {
   MarketSearchResult,
   OptionContract,
+  OptionRight,
+  OptionsBookScan,
+  OptionsScanRow,
   OptionStructureView,
   OptionsDeskSnapshot,
   VolStance,
@@ -60,10 +72,21 @@ function formatExpiry(value: string) {
   });
 }
 
-const stanceCopy: Record<
-  VolStance,
-  { label: string; className: string }
-> = {
+function expiryOnOrAfter(
+  expirations: Array<{ expiration: string }>,
+  eventDate: string
+): string | null {
+  const sorted = [...expirations].sort((a, b) =>
+    a.expiration.localeCompare(b.expiration)
+  );
+  return (
+    sorted.find((row) => row.expiration >= eventDate)?.expiration ??
+    sorted.at(-1)?.expiration ??
+    null
+  );
+}
+
+const stanceCopy: Record<VolStance, { label: string; className: string }> = {
   sell_vol: {
     label: "Short vol — defined risk",
     className: "border-amber-500/30 bg-amber-500/10 text-amber-100",
@@ -71,6 +94,10 @@ const stanceCopy: Record<
   buy_vol: {
     label: "Long vol",
     className: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200",
+  },
+  event_vol: {
+    label: "Event vol — print inside this expiry",
+    className: "border-violet-500/30 bg-violet-500/10 text-violet-100",
   },
   wait: {
     label: "No-trade zone",
@@ -119,10 +146,14 @@ function SideCells({
   contract,
   atm,
   align,
+  selected,
+  onToggle,
 }: {
   contract: OptionContract | null;
   atm?: boolean;
   align: "left" | "right";
+  selected?: "long" | "short" | null;
+  onToggle?: () => void;
 }) {
   const alignClass = align === "right" ? "text-right" : "text-left";
   if (!contract) {
@@ -140,31 +171,69 @@ function SideCells({
       </>
     );
   }
+  const selectedTone =
+    selected === "long"
+      ? "bg-blue-500/20"
+      : selected === "short"
+        ? "bg-amber-500/20"
+        : "";
   const itm = contract.inTheMoney;
-  const tone = `px-2 py-1.5 tabular-nums ${alignClass} ${
+  const tone = `px-2 py-1.5 tabular-nums cursor-pointer ${alignClass} ${
     itm ? "bg-blue-500/5 text-slate-200" : "text-slate-300"
-  } ${atm ? "font-medium" : ""} ${contract.illiquid ? "opacity-60" : ""}`;
-  const muted = `px-2 py-1.5 tabular-nums ${alignClass} ${
+  } ${atm ? "font-medium" : ""} ${contract.illiquid ? "opacity-60" : ""} ${selectedTone}`;
+  const muted = `px-2 py-1.5 tabular-nums cursor-pointer ${alignClass} ${
     itm ? "bg-blue-500/5 text-slate-400" : "text-slate-500"
-  }`;
+  } ${selectedTone}`;
   return (
     <>
-      <td className={tone}>{formatMoney(contract.bid)}</td>
-      <td className={tone}>{formatMoney(contract.ask)}</td>
-      <td className={tone}>{formatIv(contract.iv)}</td>
-      <td className={tone}>{formatDelta(contract.delta)}</td>
-      <td className={`hidden lg:table-cell ${muted}`}>
+      <td className={tone} onClick={onToggle}>
+        {formatMoney(contract.bid)}
+      </td>
+      <td className={tone} onClick={onToggle}>
+        {formatMoney(contract.ask)}
+      </td>
+      <td className={tone} onClick={onToggle}>
+        {formatIv(contract.iv)}
+      </td>
+      <td className={tone} onClick={onToggle}>
+        {formatDelta(contract.delta)}
+      </td>
+      <td className={`hidden lg:table-cell ${muted}`} onClick={onToggle}>
         {contract.openInterest?.toLocaleString() ?? "—"}
       </td>
     </>
   );
 }
 
-function PayoffChart({ structure }: { structure: OptionStructureView }) {
-  const data = structure.payoff.map((point) => ({
-    price: Number(point.price.toFixed(2)),
-    pnl: Number(point.pnl.toFixed(2)),
-  }));
+function PayoffChart({
+  structure,
+  desk,
+}: {
+  structure: OptionStructureView;
+  desk: OptionsDeskSnapshot;
+}) {
+  const data = useMemo(() => {
+    const legs: StructureLeg[] = structure.legs.map((leg) => ({
+      type: leg.type,
+      side: leg.side,
+      strike: leg.strike,
+      premium: leg.premium,
+      quantity: 1,
+      iv: leg.iv,
+    }));
+    return structureCurves(legs, {
+      timeYears: timeYearsFromDays(Math.max(desk.selectedDte, 1)),
+      rate: desk.rate,
+      dividendYield: desk.dividendYield,
+    }).map((point) => ({
+      price: Number(point.price.toFixed(2)),
+      expiration: Number(point.expiration.toFixed(2)),
+      live: point.live != null ? Number(point.live.toFixed(2)) : null,
+      shock: point.shock != null ? Number(point.shock.toFixed(2)) : null,
+    }));
+  }, [structure, desk.selectedDte, desk.rate, desk.dividendYield]);
+
+  const hasLive = data.some((row) => row.live != null);
 
   return (
     <div className="h-56 w-full">
@@ -186,23 +255,156 @@ function PayoffChart({ structure }: { structure: OptionStructureView }) {
               border: "1px solid #2b3137",
               borderRadius: 8,
             }}
-            formatter={(value) => [
+            formatter={(value, name) => [
               formatMoney(Number(value)),
-              "Expiration P&L",
+              name === "expiration"
+                ? "Expiration"
+                : name === "live"
+                  ? "Now (current IV)"
+                  : "Now, IV +5 pts",
             ]}
             labelFormatter={(label) => `Spot ${formatMoney(Number(label))}`}
+          />
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: "#949ca4" }}
+            formatter={(value) =>
+              value === "expiration"
+                ? "Expiration"
+                : value === "live"
+                  ? "Now"
+                  : "Now, IV +5"
+            }
           />
           <ReferenceLine y={0} stroke="#575f66" />
           <Line
             type="linear"
-            dataKey="pnl"
+            dataKey="expiration"
             stroke="#00c805"
             dot={false}
             strokeWidth={2}
           />
+          {hasLive && (
+            <Line
+              type="linear"
+              dataKey="live"
+              stroke="#4ea8de"
+              dot={false}
+              strokeWidth={2}
+            />
+          )}
+          {hasLive && (
+            <Line
+              type="linear"
+              dataKey="shock"
+              stroke="#c084fc"
+              dot={false}
+              strokeWidth={1.5}
+              strokeDasharray="4 4"
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>
+  );
+}
+
+function stanceLabel(stance: VolStance) {
+  return stanceCopy[stance].label;
+}
+
+function BookScanPanel({
+  scan,
+  loading,
+  error,
+  onOpen,
+}: {
+  scan: OptionsBookScan | null;
+  loading: boolean;
+  error: string | null;
+  onOpen: (row: OptionsScanRow) => void;
+}) {
+  if (!loading && !scan && !error) return null;
+
+  return (
+    <section className="surface-2 rounded-2xl p-5">
+      <h3 className="text-sm font-medium text-slate-200">Portfolio book scan</h3>
+      <p className="mt-1 text-xs text-slate-500">
+        IV versus 30-day RV and term shape across your holdings. The one-name
+        desk below is for sizing; this is how you find a trade. Names without
+        listed options are skipped, not failed.
+      </p>
+      {error && (
+        <p className="mt-3 text-sm text-red-300">{error}</p>
+      )}
+      {loading && !scan && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-16 w-full rounded-xl" />
+          ))}
+        </div>
+      )}
+      {scan && (
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[640px] text-xs">
+            <thead>
+              <tr className="border-b border-slate-800 text-slate-500">
+                <th className="px-2 py-2 text-left font-medium">Name</th>
+                <th className="px-2 py-2 text-right font-medium">ATM IV</th>
+                <th className="px-2 py-2 text-right font-medium">30d RV</th>
+                <th className="px-2 py-2 text-right font-medium">IV/RV</th>
+                <th className="px-2 py-2 text-left font-medium">Term</th>
+                <th className="px-2 py-2 text-left font-medium">Stance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scan.rows.map((row) => (
+                <tr
+                  key={row.symbol}
+                  className={`border-b border-slate-800/80 ${
+                    row.skipped
+                      ? "text-slate-500"
+                      : "cursor-pointer hover:bg-slate-900/80"
+                  }`}
+                  onClick={() => {
+                    if (!row.skipped) onOpen(row);
+                  }}
+                >
+                  <td className="px-2 py-2">
+                    <span className="font-medium text-white">{row.symbol}</span>
+                    <span className="ml-2 text-slate-500">{row.name}</span>
+                    {row.earningsInWindow && (
+                      <span className="ml-2 rounded-md bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-200">
+                        Print in window
+                      </span>
+                    )}
+                    {row.skipped && (
+                      <span className="ml-2 text-[11px] text-slate-500">
+                        {row.skipped}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {formatIv(row.atmIv)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums">
+                    {formatIv(row.rv30)}
+                  </td>
+                  <td className="px-2 py-2 text-right tabular-nums text-slate-200">
+                    {row.ivRvRatio != null ? `${row.ivRvRatio.toFixed(2)}×` : "—"}
+                  </td>
+                  <td className="px-2 py-2 capitalize text-slate-400">
+                    {row.termShape === "unknown" ? "—" : row.termShape}
+                  </td>
+                  <td className="px-2 py-2 text-slate-300">
+                    {row.skipped ? "—" : stanceLabel(row.stance)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -210,17 +412,69 @@ function DeskReport({
   desk,
   onExpiryChange,
   onOpenThesis,
+  requestedEventDate,
 }: {
   desk: OptionsDeskSnapshot;
   onExpiryChange: (expiry: string) => void;
   onOpenThesis?: (symbol: string) => void;
+  requestedEventDate?: string;
 }) {
   const stance = stanceCopy[desk.stance];
+  const [showWeeklies, setShowWeeklies] = useState(
+    desk.selectedDte < 7
+  );
+  const [buildSide, setBuildSide] = useState<"long" | "short">(
+    desk.stance === "sell_vol" ? "short" : "long"
+  );
+  const [draft, setDraft] = useState<DraftLeg[]>([]);
+  const appliedEvent = useRef<string | null>(null);
+
+  const lookup = useCallback(
+    (type: OptionRight, strike: number) => {
+      const row = desk.chain.find((item) => item.strike === strike);
+      if (!row) return null;
+      return type === "call" ? row.call : row.put;
+    },
+    [desk.chain]
+  );
+
+  const custom = useMemo(
+    () => customStructureView(draft, lookup, desk.stance),
+    [draft, lookup, desk.stance]
+  );
+
   const recommended =
     desk.structures.find((row) => row.recommended) ?? desk.structures[0] ?? null;
-  const [selectedId, setSelectedId] = useState(recommended?.id ?? null);
+  const [selectedId, setSelectedId] = useState(
+    custom?.id ?? recommended?.id ?? null
+  );
+
+  useEffect(() => {
+    if (!requestedEventDate) return;
+    const key = `${desk.symbol}:${requestedEventDate}`;
+    if (appliedEvent.current === key) return;
+    const wanted = expiryOnOrAfter(desk.expirations, requestedEventDate);
+    if (!wanted || wanted === desk.selectedExpiration) {
+      appliedEvent.current = key;
+      return;
+    }
+    appliedEvent.current = key;
+    const meta = desk.expirations.find((row) => row.expiration === wanted);
+    if (meta && meta.dte < 7) setShowWeeklies(true);
+    onExpiryChange(wanted);
+  }, [
+    desk.symbol,
+    desk.expirations,
+    desk.selectedExpiration,
+    requestedEventDate,
+    onExpiryChange,
+  ]);
+
+  const structures = custom ? [custom, ...desk.structures] : desk.structures;
   const selected =
-    desk.structures.find((row) => row.id === selectedId) ?? recommended;
+    structures.find((row) => row.id === selectedId) ??
+    custom ??
+    recommended;
 
   const termData = useMemo(
     () =>
@@ -234,7 +488,26 @@ function DeskReport({
     [desk.expirations]
   );
 
+  const visibleExpiries = desk.expirations.filter(
+    (row) =>
+      showWeeklies ||
+      row.dte >= 7 ||
+      row.expiration === desk.selectedExpiration
+  );
   const loadedExpiries = desk.expirations.filter((row) => row.atmIv != null);
+
+  function selectedSide(type: OptionRight, strike: number) {
+    return (
+      draft.find((leg) => leg.type === type && leg.strike === strike)?.side ??
+      null
+    );
+  }
+
+  function handleToggle(type: OptionRight, strike: number) {
+    const next = toggleDraftLeg(draft, { type, strike, side: buildSide });
+    setDraft(next);
+    if (next.length > 0) setSelectedId("custom");
+  }
 
   return (
     <div className="space-y-6">
@@ -287,7 +560,7 @@ function DeskReport({
             value={
               desk.ivRvRatio != null ? `${desk.ivRvRatio.toFixed(2)}×` : "—"
             }
-            hint="Rich above 1.15, cheap below 0.85"
+            hint="Everyday VRP band: 0.85–1.15"
           />
           <Metric
             label="VRP (IV − RV)"
@@ -304,9 +577,18 @@ function DeskReport({
             hint="Implied 1σ daily move"
           />
           <Metric
-            label="Move to expiry"
-            value={formatMoney(desk.expectedMoveToExpiry, 2)}
-            hint="Spot × IV × √T"
+            label={desk.earningsInWindow ? "Implied print move" : "Move to expiry"}
+            value={formatMoney(
+              desk.earningsInWindow
+                ? desk.eventImpliedMove
+                : desk.expectedMoveToExpiry,
+              2
+            )}
+            hint={
+              desk.earningsInWindow
+                ? "Spot × IV × √(days to print)"
+                : "Spot × IV × √T"
+            }
           />
           <Metric
             label="Term structure"
@@ -426,26 +708,60 @@ function DeskReport({
           <div>
             <h3 className="text-sm font-medium text-slate-200">Option chain</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Calls left, puts right, strike down the middle. ITM cells are
-              tinted. Illiquid rows (wide spread or thin open interest) are
-              dimmed. Always work a limit inside the quote.
+              Click a call or put to add it as a leg. Click again to remove.
+              Buy uses the ask; sell uses the bid. Front-week expiries stay
+              hidden until you turn weeklies on.
             </p>
           </div>
-          <label className="text-xs text-slate-400">
-            Expiration
-            <select
-              className="ml-2 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-white"
-              value={desk.selectedExpiration}
-              onChange={(event) => onExpiryChange(event.target.value)}
-            >
-              {desk.expirations.map((row) => (
-                <option key={row.expiration} value={row.expiration}>
-                  {formatExpiry(row.expiration)} · {formatDte(row.dte)}
-                  {row.atmIv != null ? ` · IV ${formatIv(row.atmIv)}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex rounded-lg border border-slate-700 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setBuildSide("long")}
+                className={`rounded-md px-2.5 py-1 ${
+                  buildSide === "long"
+                    ? "bg-blue-500/20 text-blue-200"
+                    : "text-slate-400"
+                }`}
+              >
+                Buy
+              </button>
+              <button
+                type="button"
+                onClick={() => setBuildSide("short")}
+                className={`rounded-md px-2.5 py-1 ${
+                  buildSide === "short"
+                    ? "bg-amber-500/20 text-amber-200"
+                    : "text-slate-400"
+                }`}
+              >
+                Sell
+              </button>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                checked={showWeeklies}
+                onChange={(event) => setShowWeeklies(event.target.checked)}
+              />
+              Weeklies / 0 DTE
+            </label>
+            <label className="text-xs text-slate-400">
+              Expiration
+              <select
+                className="ml-2 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-white"
+                value={desk.selectedExpiration}
+                onChange={(event) => onExpiryChange(event.target.value)}
+              >
+                {visibleExpiries.map((row) => (
+                  <option key={row.expiration} value={row.expiration}>
+                    {formatExpiry(row.expiration)} · {formatDte(row.dte)}
+                    {row.atmIv != null ? ` · IV ${formatIv(row.atmIv)}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         {loadedExpiries.length < desk.expirations.length && (
@@ -453,6 +769,43 @@ function DeskReport({
             ATM IV is preloaded on {loadedExpiries.length} slices for the term
             structure. Pick another expiry to load its full chain.
           </p>
+        )}
+
+        {custom && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-slate-700/80 bg-slate-900/50 px-3 py-2 text-xs text-slate-300">
+            <span className="font-medium text-white">Custom</span>
+            <span className="uppercase tracking-wide text-slate-500">
+              {custom.debitCredit} {formatMoney(custom.netPremium)}
+            </span>
+            <span>
+              Max loss{" "}
+              {custom.maxLoss == null ? "unlimited" : formatMoney(custom.maxLoss, 0)}
+            </span>
+            {(() => {
+              const match = structureMatchesStance(
+                desk.stance,
+                custom.netVega,
+                custom.definedRisk
+              );
+              if (match === "match") {
+                return <span className="text-emerald-300">Matches vol stance</span>;
+              }
+              if (match === "conflict") {
+                return <span className="text-amber-200">Fights vol stance</span>;
+              }
+              return <span className="text-slate-500">No vol view to match</span>;
+            })()}
+            <button
+              type="button"
+              className="ml-auto text-slate-400 hover:text-white"
+              onClick={() => {
+                setDraft([]);
+                setSelectedId(recommended?.id ?? null);
+              }}
+            >
+              Clear legs
+            </button>
+          </div>
         )}
 
         <div className="mt-4 overflow-x-auto">
@@ -495,7 +848,17 @@ function DeskReport({
                       atm ? "bg-violet-500/5" : ""
                     }`}
                   >
-                    <SideCells contract={row.call} atm={atm} align="right" />
+                    <SideCells
+                      contract={row.call}
+                      atm={atm}
+                      align="right"
+                      selected={selectedSide("call", row.strike)}
+                      onToggle={
+                        row.call
+                          ? () => handleToggle("call", row.strike)
+                          : undefined
+                      }
+                    />
                     <td
                       className={`px-2 py-1.5 text-center tabular-nums font-medium ${
                         atm ? "text-violet-200" : "text-white"
@@ -503,7 +866,17 @@ function DeskReport({
                     >
                       {row.strike}
                     </td>
-                    <SideCells contract={row.put} atm={atm} align="left" />
+                    <SideCells
+                      contract={row.put}
+                      atm={atm}
+                      align="left"
+                      selected={selectedSide("put", row.strike)}
+                      onToggle={
+                        row.put
+                          ? () => handleToggle("put", row.strike)
+                          : undefined
+                      }
+                    />
                   </tr>
                 );
               })}
@@ -512,7 +885,7 @@ function DeskReport({
         </div>
       </section>
 
-      {desk.structures.length > 0 && (
+      {structures.length > 0 && (
         <section className="surface-2 rounded-2xl p-5">
           <h3 className="text-sm font-medium text-slate-200">
             Structure toolkit
@@ -524,7 +897,7 @@ function DeskReport({
             One contract, multiplier 100. Not a broker — no live margin.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {desk.structures.map((structure) => {
+            {structures.map((structure) => {
               const active = structure.id === selected?.id;
               return (
                 <button
@@ -642,11 +1015,11 @@ function DeskReport({
               </div>
               <div>
                 <p className="mb-2 text-xs text-slate-500">
-                  Expiration P&amp;L per 1 spread (×100), other things equal.
-                  Instantaneous P&amp;L before expiry will differ because of
-                  remaining extrinsic value.
+                  Green is expiration P&amp;L. Blue is mark-to-model at current
+                  IV and remaining time — that is the gamma/theta path you live
+                  through. Dashed is the same curve after a +5 vol-point shock.
                 </p>
-                <PayoffChart structure={selected} />
+                <PayoffChart structure={selected} desk={desk} />
               </div>
             </div>
           )}
@@ -692,9 +1065,17 @@ function DeskReport({
 
 export default function OptionsDesk({
   active = true,
+  portfolioSymbols = [],
+  requestedSymbol,
+  requestedAt,
+  requestedEventDate,
   onOpenThesis,
 }: {
   active?: boolean;
+  portfolioSymbols?: string[];
+  requestedSymbol?: string | null;
+  requestedAt?: number;
+  requestedEventDate?: string;
   onOpenThesis?: (symbol: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -704,7 +1085,11 @@ export default function OptionsDesk({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [desk, setDesk] = useState<OptionsDeskSnapshot | null>(null);
+  const [scan, setScan] = useState<OptionsBookScan | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const restored = useRef(false);
+  const scanKey = useRef<string | null>(null);
 
   const loadDesk = useCallback(async (symbol: string, expiry?: string) => {
     setLoading(true);
@@ -724,12 +1109,19 @@ export default function OptionsDesk({
       setSearchQuery(`${next.symbol} — ${next.name}`);
       lastOptionsSymbolStore.set({ symbol: next.symbol, name: next.name });
     } catch (err) {
-      setDesk(null);
       setError(err instanceof Error ? err.message : "Something went wrong");
+      setDesk((current) => (current?.symbol === symbol.toUpperCase() ? current : null));
     } finally {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    const symbol = requestedSymbol?.trim().toUpperCase();
+    if (!active || !symbol || requestedAt == null) return;
+    restored.current = true;
+    void loadDesk(symbol);
+  }, [active, requestedSymbol, requestedAt, loadDesk]);
 
   useEffect(() => {
     if (!active || restored.current) return;
@@ -741,6 +1133,31 @@ export default function OptionsDesk({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [active, loadDesk]);
+
+  useEffect(() => {
+    if (!active || portfolioSymbols.length === 0) return;
+    const key = portfolioSymbols.join(",");
+    if (scanKey.current === key) return;
+    scanKey.current = key;
+    setScanLoading(true);
+    setScanError(null);
+    void fetch("/api/options/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols: portfolioSymbols }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error ?? "Book scan failed");
+        }
+        setScan(data as OptionsBookScan);
+      })
+      .catch((err) => {
+        setScanError(err instanceof Error ? err.message : "Book scan failed");
+      })
+      .finally(() => setScanLoading(false));
+  }, [active, portfolioSymbols]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -795,6 +1212,13 @@ export default function OptionsDesk({
         </form>
       </section>
 
+      <BookScanPanel
+        scan={scan}
+        loading={scanLoading}
+        error={scanError}
+        onOpen={(row) => void loadDesk(row.symbol, row.expiration ?? undefined)}
+      />
+
       {error && (
         <div className="flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           <TriangleAlert className="h-4 w-4 shrink-0" />
@@ -802,22 +1226,26 @@ export default function OptionsDesk({
         </div>
       )}
 
-      {loading && <OptionsSkeleton />}
+      {loading && !desk && <OptionsSkeleton />}
+      {loading && desk && (
+        <p className="text-center text-sm text-slate-500">Updating chain…</p>
+      )}
 
       {!loading && !desk && !error && (
         <EmptyState
           icon={Activity}
           title="No chain loaded"
-          description="Search a name with listed options. You will get ATM IV versus realized vol, the term structure, skew, a stance, and defined-risk structures sized to that view."
+          description="Search a name with listed options, or click a holding in the book scan. You will get ATM IV versus realized vol, the term structure, skew, a stance, and defined-risk structures sized to that view."
         />
       )}
 
-      {!loading && desk && (
+      {desk && (
         <DeskReport
           key={`${desk.symbol}-${desk.selectedExpiration}`}
           desk={desk}
           onExpiryChange={(expiry) => void loadDesk(desk.symbol, expiry)}
           onOpenThesis={onOpenThesis}
+          requestedEventDate={requestedEventDate}
         />
       )}
     </div>

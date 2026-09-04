@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Landmark, Search, TriangleAlert } from "lucide-react";
 import EmptyState from "./EmptyState";
-import OpenThesisButton from "./OpenThesisButton";
+import SymbolJumps from "./SymbolJumps";
 import { Skeleton } from "./Skeleton";
 import {
   NOTABLE_INVESTORS,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/thirteen-f-filers";
 import { lastCopyTraderStore } from "@/lib/tab-memory";
 import type {
+  OpenOptionsHint,
   ThirteenFFilerReport,
   ThirteenFSearchHit,
   ThirteenFTradeAction,
@@ -85,12 +86,14 @@ function NameCell({
   ticker,
   owned,
   onOpenThesis,
+  onOpenOptions,
 }: {
   issuer: string;
   detail?: string;
   ticker: string | null;
   owned: boolean;
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -108,8 +111,12 @@ function NameCell({
           {ticker && detail ? ` · ${detail}` : ""}
         </p>
       </div>
-      {ticker && onOpenThesis && (
-        <OpenThesisButton symbol={ticker} onOpen={onOpenThesis} />
+      {ticker && (
+        <SymbolJumps
+          symbol={ticker}
+          onOpenThesis={onOpenThesis}
+          onOpenOptions={onOpenOptions}
+        />
       )}
     </div>
   );
@@ -119,10 +126,12 @@ export default function CopyTrading({
   active = true,
   portfolioSymbols = [],
   onOpenThesis,
+  onOpenOptions,
 }: {
   active?: boolean;
   portfolioSymbols?: string[];
   onOpenThesis?: (symbol: string) => void;
+  onOpenOptions?: (symbol: string, hint?: OpenOptionsHint) => void;
 }) {
   const listboxId = useId();
   const [query, setQuery] = useState("");
@@ -559,6 +568,7 @@ export default function CopyTrading({
                             portfolioOwned.has(trade.ticker.toUpperCase())
                         )}
                         onOpenThesis={onOpenThesis}
+                        onOpenOptions={onOpenOptions}
                       />
                       <span className="text-sm tabular-nums text-slate-200">
                         {formatUsd(trade.valueChangeUsd)}
@@ -602,6 +612,7 @@ export default function CopyTrading({
                               portfolioOwned.has(row.ticker.toUpperCase())
                           )}
                           onOpenThesis={onOpenThesis}
+                          onOpenOptions={onOpenOptions}
                         />
                       </td>
                       <td className="px-3 py-2.5 font-mono text-xs text-slate-400">
@@ -680,6 +691,7 @@ export default function CopyTrading({
                               portfolioOwned.has(trade.ticker.toUpperCase())
                           )}
                           onOpenThesis={onOpenThesis}
+                          onOpenOptions={onOpenOptions}
                         />
                       </td>
                       <td className="px-3 py-2.5 text-right tabular-nums text-slate-200">

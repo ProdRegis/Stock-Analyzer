@@ -91,15 +91,30 @@ describe("volStance", () => {
     expect(result.preferredStructure).toBe("none");
   });
 
-  it("refuses to sell rich IV when earnings sit inside the window", () => {
+  it("treats earnings inside the window as event vol, not a VRP sale", () => {
     const result = volStance({
       ...liquid,
       atmIv: 0.5,
       rv30: 0.3,
       earningsInWindow: true,
     });
-    expect(result.stance).toBe("wait");
-    expect(result.warnings.some((row) => /earnings/i.test(row))).toBe(true);
+    expect(result.stance).toBe("event_vol");
+    expect(result.preferredStructure).toBe("long_straddle");
+    expect(result.reasons.some((row) => /event vol/i.test(row))).toBe(true);
+    expect(result.reasons.some((row) => /do not harvest vrp/i.test(row))).toBe(
+      true
+    );
+  });
+
+  it("still flags event vol when IV is cheap versus RV", () => {
+    const result = volStance({
+      ...liquid,
+      atmIv: 0.18,
+      rv30: 0.28,
+      earningsInWindow: true,
+    });
+    expect(result.stance).toBe("event_vol");
+    expect(result.preferredStructure).toBe("long_straddle");
   });
 
   it("does not treat inverted term structure as vanilla VRP", () => {
