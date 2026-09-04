@@ -9,7 +9,7 @@ and news into a single dashboard.
 
 ## Features
 
-The dashboard is organized into seven tabs.
+The dashboard is organized into eight tabs.
 
 **Portfolio Analysis** — Enter tickers, share counts, and optionally your
 average cost. Returns a weighted risk score built from volatility, beta,
@@ -90,6 +90,20 @@ a buy / short / wait call for *when* — before the print only when the beat
 history and post-print drift are both identified. Dividends show a quarterly
 run-rate and a pay/maintain chance from payout and cash-flow coverage; chasing
 the ex-date is not treated as an edge.
+
+**Options** — Search a ticker and read the listed chain the way a vol trader
+does, not as a leveraged directional bet. ATM implied vol is inverted from
+the market premium with Black–Scholes–Merton (and compared to Yahoo's IV when
+it is present). Realized vol is Yang–Zhang when the bars support it, else
+Garman–Klass / close-to-close, at 10 / 20 / 30 / 60 / 90 day lookbacks. The
+stance is IV versus 30-day RV, confirmed by term-structure shape (contango vs
+backwardation) and killed by a wide bid–ask, thin open interest, an inverted
+front, or earnings inside the selected expiry. Theta is labeled as the rent
+for gamma, not an edge. Structures (long straddle / strangle, debit and credit
+verticals, iron condor, covered-call overlay, cash-secured put) show expiration
+P&L, breakevens, defined-risk capital, and net Greeks. Naked short calls are
+not the recommended expression of a short-vol view. This is not a broker and
+does not estimate Interactive Brokers margin.
 
 Across all tabs: portfolios are saved in the browser and restored on return,
 charts plot your cost basis, and the header shows live market status alongside a
@@ -184,7 +198,7 @@ Push the repository to GitHub, import it at
 [vercel.com/new](https://vercel.com/new), and add `SITE_PASSWORD` under
 **Settings → Environment Variables** before the first deploy.
 
-The scanner, batch, and 13F endpoints fan out or parse large filings, so they
+The scanner, batch, 13F, and options-desk endpoints fan out or parse large filings, so they
 set `maxDuration = 60` to clear Vercel's default 10-second function timeout.
 Copy Trading reads SEC EDGAR for 13F books. EDGAR 403s script-style
 User-Agents from cloud hosts; the app sends a browser-like User-Agent by
@@ -204,6 +218,9 @@ already confirmed works against `data.sec.gov`.
 | **Business quality** | Durable / Fair / Speculative / Pass from profit, FCF, margins, and leverage — used to re-rank scanner hits |
 | **Implied return** | Reverse DCF: fade conservative growth to 2.5% over 8 years and solve for the discount rate that matches today's EV or market cap |
 | **Event hit chance** | Student-t predictive from this name's EPS surprises (shrunk toward a 67% market prior), or dividend coverage from payout / FCF |
+| **Implied volatility** | Invert the listed mid/ask with Black–Scholes–Merton; Yahoo's chain IV is used when present. European formula on American equity options |
+| **Realized volatility** | Yang–Zhang (overnight + range) when identified, else Garman–Klass or close-to-close log-return σ × √252 |
+| **IV / RV** | ATM IV divided by 30-day RV. Above ~1.15 is rich (short-vol candidate); below ~0.85 is cheap. Theta is not treated as edge |
 | **RSI** | Wilder's smoothing; returns neutral 50 on a flat series |
 | **Resistance** | Clustered local price highs from recent history |
 | **Breakout** | Price crossing resistance/support with volume confirmation |
@@ -223,7 +240,7 @@ market cap if earnings are used instead of free cash flow).
 coalescing (`src/lib/cache.ts`). Coalescing is the important half: without it,
 N clients polling on the same interval produce N upstream calls even when the
 first is still in flight. TTLs are tuned per data type — 5 seconds for quotes,
-15 minutes for daily history. The cache serves stale data if a refresh fails,
+15 minutes for daily history, 60 seconds for option chains. The cache serves stale data if a refresh fails,
 and evicts least-recently-used entries past a cap. It lives in module scope, so
 a multi-instance deployment would want a shared store like Redis.
 
@@ -254,12 +271,14 @@ disagree the feed wins and the countdown is hidden rather than shown wrong.
 npm test
 ```
 
-258 tests covering the financial math (volatility, beta, Sharpe, drawdown,
+329 tests covering the financial math (volatility, beta, Sharpe, drawdown,
 correlation, R² and reliability of the SPY regression), technical indicators (RSI, ATR, moving averages, support and
 resistance), sell-reminder urgency (price hit, due date, approaching), 13F
 parse, quarter-over-quarter trades, and the top-50 display cap, reverse DCF
 and business-quality grades used by the thesis tab, event hit chances
-(Student-t predictive surprises, dividend coverage, buy/short stance), cache
+(Student-t predictive surprises, dividend coverage, buy/short stance), Black–Scholes
+prices and Greeks, implied-vol inversion, realized-vol estimators, option
+payoffs and the IV/RV stance, cache
 behavior including coalescing and stale-on-error, rate limit enforcement, the
 password gate, profile isolation and migration, market hours across weekends
 and both daylight and standard time, and both import parsers including the

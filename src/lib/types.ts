@@ -630,3 +630,143 @@ export interface ThirteenFFilerReport {
   matchCount: number | null;
   sourceUrl: string;
 }
+
+export type OptionRight = "call" | "put";
+export type VolStance = "sell_vol" | "buy_vol" | "wait";
+export type TermShape = "contango" | "backwardation" | "flat" | "unknown";
+export type PreferredOptionStructure =
+  | "iron_condor"
+  | "put_credit_spread"
+  | "long_straddle"
+  | "long_strangle"
+  | "call_debit_spread"
+  | "none";
+
+export type OptionStructureId =
+  | "long_call"
+  | "long_put"
+  | "long_straddle"
+  | "long_strangle"
+  | "call_debit_spread"
+  | "put_credit_spread"
+  | "iron_condor"
+  | "covered_call"
+  | "cash_secured_put";
+
+export interface OptionContract {
+  contractSymbol: string;
+  type: OptionRight;
+  strike: number;
+  bid: number | null;
+  ask: number | null;
+  last: number | null;
+  mid: number | null;
+  spread: number | null;
+  spreadPct: number | null;
+  volume: number | null;
+  openInterest: number | null;
+  yahooIv: number | null;
+  iv: number | null;
+  ivSource: "yahoo" | "inverted" | null;
+  delta: number | null;
+  gamma: number | null;
+  theta: number | null;
+  vega: number | null;
+  rho: number | null;
+  intrinsic: number;
+  extrinsic: number | null;
+  inTheMoney: boolean;
+  illiquid: boolean;
+}
+
+export interface OptionExpirationMeta {
+  expiration: string;
+  dte: number;
+  atmIv: number | null;
+  atmStrike: number | null;
+}
+
+export interface OptionChainRow {
+  strike: number;
+  call: OptionContract | null;
+  put: OptionContract | null;
+}
+
+export interface OptionStructureLegView {
+  type: OptionRight;
+  side: "long" | "short";
+  strike: number;
+  premium: number;
+  delta: number | null;
+  iv: number | null;
+}
+
+export interface OptionStructureView {
+  id: OptionStructureId;
+  name: string;
+  thesis: string;
+  debitCredit: "debit" | "credit";
+  netPremium: number;
+  multiplier: number;
+  maxProfit: number | null;
+  maxLoss: number | null;
+  breakevens: number[];
+  capitalAtRisk: number | null;
+  definedRisk: boolean;
+  recommended: boolean;
+  legs: OptionStructureLegView[];
+  payoff: Array<{ price: number; pnl: number }>;
+  netDelta: number | null;
+  netGamma: number | null;
+  netTheta: number | null;
+  netVega: number | null;
+}
+
+export interface OptionsDeskSnapshot {
+  symbol: string;
+  name: string;
+  spot: number;
+  currency: string;
+  changePercent: number;
+  rate: number;
+  rateSource: string;
+  dividendYield: number;
+  selectedExpiration: string;
+  selectedDte: number;
+  expirations: OptionExpirationMeta[];
+  termShape: TermShape;
+  termSlopePerMonth: number | null;
+  forwardVol: number | null;
+  atmIv: number | null;
+  atmStrike: number | null;
+  rv: {
+    d10: number | null;
+    d20: number | null;
+    d30: number | null;
+    d60: number | null;
+    d90: number | null;
+    estimator: string | null;
+  };
+  ivRvRatio: number | null;
+  vrp: number | null;
+  ivPercentile: number | null;
+  expectedDailyMove: number | null;
+  expectedMoveToExpiry: number | null;
+  skew: {
+    putIv: number | null;
+    callIv: number | null;
+    riskReversal: number | null;
+    putDelta: number | null;
+    callDelta: number | null;
+  };
+  stance: VolStance;
+  preferredStructure: PreferredOptionStructure;
+  reasons: string[];
+  warnings: string[];
+  earningsDate: string | null;
+  earningsInWindow: boolean;
+  chain: OptionChainRow[];
+  structures: OptionStructureView[];
+  modelNote: string;
+  asOf: string;
+}

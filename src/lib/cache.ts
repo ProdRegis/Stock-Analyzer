@@ -52,6 +52,12 @@ export const TTL = {
    * people land on the page.
    */
   demoScan: 10 * 60_000,
+  /**
+   * Option chains move all session, but a full multi-expiry pull is several
+   * upstream calls. One minute is short enough to feel current and long
+   * enough that switching expirations does not refetch the whole surface.
+   */
+  options: 60_000,
 } as const;
 
 function readFresh<T>(key: string): Entry<T> | null {

@@ -10,6 +10,7 @@ import CopyTrading from "./CopyTrading";
 import CorrelationHeatmap from "./CorrelationHeatmap";
 import HoldingsTable from "./HoldingsTable";
 import InvestmentThesis from "./InvestmentThesis";
+import OptionsDesk from "./OptionsDesk";
 import PortfolioAllocation from "./PortfolioAllocation";
 import PortfolioInput from "./PortfolioInput";
 import PortfolioSummary from "./PortfolioSummary";
@@ -321,6 +322,15 @@ export default function Dashboard() {
           <RecentNews
             portfolioSymbols={portfolioSymbols}
             active={activeTab === "news"}
+            onOpenThesis={openThesis}
+          />
+        </TabPanel>
+      )}
+
+      {visited("options") && (
+        <TabPanel active={activeTab === "options"}>
+          <OptionsDesk
+            active={activeTab === "options"}
             onOpenThesis={openThesis}
           />
         </TabPanel>

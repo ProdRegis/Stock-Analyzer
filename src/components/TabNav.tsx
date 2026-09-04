@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   BookOpen,
   Briefcase,
   Landmark,
@@ -18,7 +19,8 @@ export type DashboardTab =
   | "picks"
   | "stop-loss"
   | "copy-trading"
-  | "news";
+  | "news"
+  | "options";
 
 interface TabNavProps {
   activeTab: DashboardTab;
@@ -33,6 +35,7 @@ const tabs: Array<{ id: DashboardTab; label: string; icon: LucideIcon }> = [
   { id: "stop-loss", label: "Safety Stops", icon: ShieldAlert },
   { id: "copy-trading", label: "Copy Trading", icon: Landmark },
   { id: "news", label: "News & Events", icon: Newspaper },
+  { id: "options", label: "Options", icon: Activity },
 ];
 
 export default function TabNav({ activeTab, onChange }: TabNavProps) {

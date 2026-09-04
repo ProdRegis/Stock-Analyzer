@@ -71,6 +71,9 @@ export const RECENT_THESES_STORAGE_KEY =
 export const LAST_COPY_TRADER_STORAGE_KEY =
   "portfolio-risk-analyzer:last-copy-trader";
 
+export const LAST_OPTIONS_SYMBOL_STORAGE_KEY =
+  "portfolio-risk-analyzer:last-options-symbol";
+
 /**
  * Keys holding per-person data. Each is suffixed with the profile id, so
  * switching profiles swaps the whole set. Add new personal data keys here and
@@ -81,4 +84,5 @@ export const PROFILE_SCOPED_KEYS = [
   WORKING_PORTFOLIO_STORAGE_KEY,
   RECENT_THESES_STORAGE_KEY,
   LAST_COPY_TRADER_STORAGE_KEY,
+  LAST_OPTIONS_SYMBOL_STORAGE_KEY,
 ] as const;

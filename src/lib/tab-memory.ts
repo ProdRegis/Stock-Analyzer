@@ -1,6 +1,7 @@
 import type { ThesisStance } from "./types";
 import {
   LAST_COPY_TRADER_STORAGE_KEY,
+  LAST_OPTIONS_SYMBOL_STORAGE_KEY,
   RECENT_THESES_STORAGE_KEY,
 } from "./constants";
 import { createPersistentStore } from "./persistent-store";
@@ -124,3 +125,49 @@ export const lastCopyTraderStore = createPersistentStore<LastCopyTrader | null>(
 
 registerProfileScopedStore(recentThesesStore);
 registerProfileScopedStore(lastCopyTraderStore);
+
+export interface LastOptionsSymbol {
+  symbol: string;
+  name: string;
+}
+
+function isLastOptionsSymbol(value: unknown): value is LastOptionsSymbol {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.symbol === "string" && typeof record.name === "string";
+}
+
+export function loadLastOptionsSymbol(): LastOptionsSymbol | null {
+  if (typeof window === "undefined") return null;
+  const key = activeKey(LAST_OPTIONS_SYMBOL_STORAGE_KEY);
+  if (key === null) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    return isLastOptionsSymbol(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function persistLastOptionsSymbol(value: LastOptionsSymbol | null): void {
+  if (typeof window === "undefined") return;
+  const key = activeKey(LAST_OPTIONS_SYMBOL_STORAGE_KEY);
+  if (key === null) return;
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Storage full or blocked.
+  }
+}
+
+export const lastOptionsSymbolStore =
+  createPersistentStore<LastOptionsSymbol | null>(
+    loadLastOptionsSymbol,
+    persistLastOptionsSymbol,
+    null
+  );
+
+registerProfileScopedStore(lastOptionsSymbolStore);
