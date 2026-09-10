@@ -30,4 +30,28 @@ Live site: https://stock-analyzer-lake-nu.vercel.app/
 
 The header shows live market status and a countdown to the next open or close. Charts cover 1D through 5Y. People sharing a computer can use separate profiles so holdings do not mix.
 
+## How things are calculated
+
+| Metric | Description |
+|--------|-------------|
+| **Volatility** | Standard deviation of daily log returns, annualized (× √252) |
+| **Beta** | Sensitivity to SPY on date-aligned returns, with R² and a 95% interval |
+| **Sharpe Ratio** | Excess return over volatility, using a live Treasury risk-free rate |
+| **Max Drawdown** | Largest peak-to-trough decline in the last year |
+| **Risk Score** | Composite 0–100 score from volatility, beta, and drawdown |
+| **R² vs SPY** | Share of daily moves that line up with the market; r² from the same fit as beta |
+| **Business quality** | Durable / Fair / Speculative / Pass from profit, FCF, margins, and leverage — used to re-rank scanner hits |
+| **Implied return** | Reverse DCF: fade conservative growth to 2.5% over 8 years and solve for the discount rate that matches today's EV or market cap |
+| **Event hit chance** | Student-t predictive from this name's EPS surprises (shrunk toward a 67% market prior), or dividend coverage from payout / FCF |
+| **Implied volatility** | Invert the listed mid/ask with Black–Scholes–Merton; Yahoo's chain IV is used when present. European formula on American equity options |
+| **Realized volatility** | Yang–Zhang (overnight + range) when identified, else Garman–Klass or close-to-close log-return σ × √252 |
+| **IV / RV** | ATM IV divided by 30-day RV. Above ~1.15 is rich (short-vol candidate); below ~0.85 is cheap. Theta is not treated as edge |
+| **Options picks** | Recommendation is one Robinhood Strategy builder ticket at the selected approval level, ranked by expected P&L (win × chance + miss × chance), or sit out. Chance of profit is P(expiration P&L > 0) under ATM IV. Expected return uses 30-day RV. Uncovered shorts are never a ticket |
+| **Options liquidity** | Tight = ATM spread ≤ 5% of mid and OI ≥ 1,000. Thin = OI < 200. Wide = spread > 12%. Vol screen ranks fill quality before IV/RV |
+| **RSI** | Wilder's smoothing; returns neutral 50 on a flat series |
+| **Resistance** | Clustered local price highs from recent history |
+| **Breakout** | Price crossing resistance/support with volume confirmation |
+
+Returns are logarithmic, beta is computed only over dates present in both the stock and benchmark series, and annualization uses 252 trading days. R² is the square of the Pearson correlation with SPY from that same regression — the share of daily moves the market actually explains. A high R² means beta is a useful description; a low R² means the name does not track the market. Implied return is a reverse DCF: conservative growth faded to 2.5%, solved for the discount rate that matches today's enterprise value (or market cap if earnings are used instead of free cash flow).
+
 Made by Regis.
